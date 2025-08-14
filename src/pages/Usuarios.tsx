@@ -17,6 +17,9 @@ import { useToast } from '@/hooks/use-toast';
 import { mockUsers, mockFiliais } from '@/data/mock';
 import { User } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
+import { NoUsers, NoSearchResults } from '@/components/ui/empty-states';
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 
 const userSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -205,10 +208,11 @@ export default function Usuarios() {
   const canManageUsers = currentUser?.role === 'admin' || currentUser?.role === 'gerente';
 
   if (!canManageUsers) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gradient">Meu Perfil</h1>
+  return (
+    <div className="space-y-6">
+      <Breadcrumbs />
+      <div>
+        <h1 className="text-3xl font-bold text-gradient">Meu Perfil</h1>
           <p className="text-muted-foreground">
             Visualize suas informações de usuário
           </p>
@@ -254,8 +258,15 @@ export default function Usuarios() {
     );
   }
 
+  const clearSearch = () => {
+    setSearchTerm('');
+    setRoleFilter('all');
+  };
+
   return (
     <div className="space-y-6">
+      <Breadcrumbs />
+      
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gradient">Gestão de Usuários</h1>
@@ -425,17 +436,26 @@ export default function Usuarios() {
       </Card>
 
       {/* Results */}
-      <Card className="border-0 shadow-primary">
-        <CardHeader>
-          <CardTitle>
-            Usuários ({filteredUsers.length})
-          </CardTitle>
-          <CardDescription>
-            Lista de usuários do sistema
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
+      {filteredUsers.length === 0 ? (
+        searchTerm || roleFilter !== 'all' ? (
+          <NoSearchResults searchTerm={searchTerm} onClear={clearSearch} />
+        ) : (
+          <NoUsers onCreate={currentUser?.role === 'admin' ? () => handleOpenDialog() : undefined} />
+        )
+      ) : (
+        <PaginationWrapper data={filteredUsers} itemsPerPage={10}>
+          {(paginatedUsers, pagination) => (
+            <Card className="border-0 shadow-primary">
+              <CardHeader>
+                <CardTitle>
+                  Usuários ({pagination.totalItems})
+                </CardTitle>
+                <CardDescription>
+                  Lista de usuários do sistema
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Usuário</TableHead>
@@ -447,7 +467,7 @@ export default function Usuarios() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
+              {paginatedUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -514,7 +534,10 @@ export default function Usuarios() {
             </TableBody>
           </Table>
         </CardContent>
-      </Card>
+            </Card>
+          )}
+        </PaginationWrapper>
+      )}
     </div>
   );
 }

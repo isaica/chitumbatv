@@ -10,6 +10,9 @@ import { useToast } from '@/hooks/use-toast';
 import { mockMensalidades, mockClients, mockFiliais, mockPlans } from '@/data/mock';
 import { Mensalidade } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
+import { NoMensalidades, NoSearchResults } from '@/components/ui/empty-states';
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 
 export default function Mensalidades() {
   const { user } = useAuth();
@@ -103,8 +106,17 @@ export default function Mensalidades() {
     return options;
   };
 
+  const clearSearch = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setMonthFilter('all');
+    setFilialFilter('all');
+  };
+
   return (
     <div className="space-y-6">
+      <Breadcrumbs />
+      
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gradient">Gestão de Mensalidades</h1>
@@ -227,86 +239,98 @@ export default function Mensalidades() {
       </Card>
 
       {/* Results */}
-      <Card className="border-0 shadow-primary">
-        <CardHeader>
-          <CardTitle>
-            Mensalidades ({filteredMensalidades.length})
-          </CardTitle>
-          <CardDescription>
-            Lista de mensalidades dos clientes
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Período</TableHead>
-                <TableHead>Valor</TableHead>
-                {user?.role === 'admin' && <TableHead>Filial</TableHead>}
-                <TableHead>Vencimento</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredMensalidades.map((mensalidade) => (
-                <TableRow key={mensalidade.id}>
-                  <TableCell>
-                    <div className="font-medium">{getClientName(mensalidade.clientId)}</div>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(mensalidade.year, mensalidade.month - 1).toLocaleDateString('pt-AO', {
-                      month: 'long',
-                      year: 'numeric'
-                    })}
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-medium">{mensalidade.amount.toLocaleString()} AOA</span>
-                  </TableCell>
-                  {user?.role === 'admin' && (
-                    <TableCell>{getClientFilial(mensalidade.clientId)}</TableCell>
-                  )}
-                  <TableCell>
-                    {mensalidade.dueDate.toLocaleDateString('pt-AO')}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(mensalidade.status)}
-                      <Badge 
-                        variant={
-                          mensalidade.status === 'pago' ? 'default' :
-                          mensalidade.status === 'pendente' ? 'secondary' :
-                          'destructive'
-                        }
-                      >
-                        {mensalidade.status}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {mensalidade.status !== 'pago' && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleMarkAsPaid(mensalidade.id)}
-                        className="gradient-primary"
-                      >
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Marcar como Pago
-                      </Button>
-                    )}
-                    {mensalidade.status === 'pago' && mensalidade.paidAt && (
-                      <div className="text-sm text-muted-foreground">
-                        Pago em {mensalidade.paidAt.toLocaleDateString('pt-AO')}
-                      </div>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {filteredMensalidades.length === 0 ? (
+        searchTerm || statusFilter !== 'all' || monthFilter !== 'all' || filialFilter !== 'all' ? (
+          <NoSearchResults searchTerm={searchTerm} onClear={clearSearch} />
+        ) : (
+          <NoMensalidades />
+        )
+      ) : (
+        <PaginationWrapper data={filteredMensalidades} itemsPerPage={15}>
+          {(paginatedMensalidades, pagination) => (
+            <Card className="border-0 shadow-primary">
+              <CardHeader>
+                <CardTitle>
+                  Mensalidades ({pagination.totalItems})
+                </CardTitle>
+                <CardDescription>
+                  Lista de mensalidades dos clientes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Período</TableHead>
+                      <TableHead>Valor</TableHead>
+                      {user?.role === 'admin' && <TableHead>Filial</TableHead>}
+                      <TableHead>Vencimento</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedMensalidades.map((mensalidade) => (
+                      <TableRow key={mensalidade.id}>
+                        <TableCell>
+                          <div className="font-medium">{getClientName(mensalidade.clientId)}</div>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(mensalidade.year, mensalidade.month - 1).toLocaleDateString('pt-AO', {
+                            month: 'long',
+                            year: 'numeric'
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium">{mensalidade.amount.toLocaleString()} AOA</span>
+                        </TableCell>
+                        {user?.role === 'admin' && (
+                          <TableCell>{getClientFilial(mensalidade.clientId)}</TableCell>
+                        )}
+                        <TableCell>
+                          {mensalidade.dueDate.toLocaleDateString('pt-AO')}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(mensalidade.status)}
+                            <Badge 
+                              variant={
+                                mensalidade.status === 'pago' ? 'default' :
+                                mensalidade.status === 'pendente' ? 'secondary' :
+                                'destructive'
+                              }
+                            >
+                              {mensalidade.status}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {mensalidade.status !== 'pago' && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleMarkAsPaid(mensalidade.id)}
+                              className="gradient-primary"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Marcar como Pago
+                            </Button>
+                          )}
+                          {mensalidade.status === 'pago' && mensalidade.paidAt && (
+                            <div className="text-sm text-muted-foreground">
+                              Pago em {mensalidade.paidAt.toLocaleDateString('pt-AO')}
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </PaginationWrapper>
+      )}
     </div>
   );
 }

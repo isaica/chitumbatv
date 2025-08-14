@@ -16,6 +16,9 @@ import { useToast } from '@/hooks/use-toast';
 import { mockClients, mockFiliais, mockPlans } from '@/data/mock';
 import { Client } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
+import { NoClients, NoSearchResults } from '@/components/ui/empty-states';
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 
 const clientSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -180,8 +183,17 @@ export default function Clientes() {
     });
   };
 
+  const clearSearch = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setFilialFilter('all');
+    setPlanFilter('all');
+  };
+
   return (
     <div className="space-y-6">
+      <Breadcrumbs />
+      
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gradient">Gestão de Clientes</h1>
@@ -438,14 +450,23 @@ export default function Clientes() {
       </Card>
 
       {/* Results */}
-      <Card className="border-0 shadow-primary">
-        <CardHeader>
-          <CardTitle>
-            Clientes ({filteredClients.length})
-          </CardTitle>
-          <CardDescription>
-            Lista de clientes da Chitumba TV
-          </CardDescription>
+      {filteredClients.length === 0 ? (
+        searchTerm || statusFilter !== 'all' || filialFilter !== 'all' || planFilter !== 'all' ? (
+          <NoSearchResults searchTerm={searchTerm} onClear={clearSearch} />
+        ) : (
+          <NoClientes onCreate={() => handleOpenDialog()} />
+        )
+      ) : (
+        <PaginationWrapper data={filteredClients} itemsPerPage={10}>
+          {(paginatedClients, pagination) => (
+            <Card className="border-0 shadow-primary">
+              <CardHeader>
+                <CardTitle>
+                  Clientes ({pagination.totalItems})
+                </CardTitle>
+                <CardDescription>
+                  Lista de clientes da Chitumba TV
+                </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -459,8 +480,8 @@ export default function Clientes() {
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {filteredClients.map((client) => (
+              <TableBody>
+              {paginatedClients.map((client) => (
                 <TableRow key={client.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -528,8 +549,12 @@ export default function Clientes() {
               ))}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+                </CardContent>
+              </Card>
+            )}
+          </PaginationWrapper>
+        )}
+      )}
     </div>
   );
 }

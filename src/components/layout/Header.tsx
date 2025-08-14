@@ -12,6 +12,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
+import { GlobalSearch } from './GlobalSearch';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -31,13 +32,7 @@ export function Header() {
           <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
           
           <div className="hidden md:flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Buscar clientes, mensalidades..."
-                className="pl-10 w-80"
-              />
-            </div>
+            <GlobalSearch />
           </div>
         </div>
 
