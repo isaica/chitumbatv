@@ -454,7 +454,7 @@ export default function Clientes() {
         searchTerm || statusFilter !== 'all' || filialFilter !== 'all' || planFilter !== 'all' ? (
           <NoSearchResults searchTerm={searchTerm} onClear={clearSearch} />
         ) : (
-          <NoClientes onCreate={() => handleOpenDialog()} />
+          <NoClients onCreate={() => handleOpenDialog()} />
         )
       ) : (
         <PaginationWrapper data={filteredClients} itemsPerPage={10}>
@@ -554,7 +554,6 @@ export default function Clientes() {
             )}
           </PaginationWrapper>
         )}
-      )}
     </div>
   );
 }
