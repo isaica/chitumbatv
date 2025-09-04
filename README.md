@@ -60,6 +60,12 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## IDE (Vibe Coding)
+
+- Lovable
+- Trae
+
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/cc0deb30-f43d-4226-b0de-c849f1d2eb83) and click on Share -> Publish.
