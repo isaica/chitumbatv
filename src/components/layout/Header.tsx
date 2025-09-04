@@ -26,17 +26,24 @@ export function Header() {
   };
 
   return (
-    <header className="h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-      <div className="flex items-center justify-between h-full px-4">
-        <div className="flex items-center gap-4">
+    <header className="h-12 sm:h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+      <div className="flex items-center justify-between h-full px-3 sm:px-4 lg:px-6">
+        <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
           <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
           
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-2 flex-1 max-w-md">
             <GlobalSearch />
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
+          {/* Mobile Search Button */}
+          <div className="md:hidden">
+            <Button variant="ghost" size="sm">
+              <Search className="w-4 h-4" />
+            </Button>
+          </div>
+          
           <Button variant="ghost" size="sm" className="relative">
             <Bell className="w-4 h-4" />
             <span className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full text-xs flex items-center justify-center text-destructive-foreground">
@@ -46,14 +53,14 @@ export function Header() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-2 px-2">
-                <Avatar className="w-8 h-8">
-                  <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+              <Button variant="ghost" className="flex items-center gap-2 px-1 sm:px-2">
+                <Avatar className="w-6 h-6 sm:w-8 sm:h-8">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs sm:text-sm">
                     {user ? getInitials(user.name) : 'U'}
                   </AvatarFallback>
                 </Avatar>
-                <div className="hidden md:block text-left">
-                  <p className="text-sm font-medium">{user?.name}</p>
+                <div className="hidden sm:block text-left">
+                  <p className="text-sm font-medium leading-tight">{user?.name}</p>
                   <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
                 </div>
               </Button>

@@ -110,12 +110,12 @@ interface MetricCardProps {
 function MetricCard({ title, value, description, icon: Icon, trend, trendValue, className }: MetricCardProps) {
   return (
     <Card className={`gradient-card border-0 shadow-primary ${className}`}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-card-foreground/80">{title}</CardTitle>
-        <Icon className="w-4 h-4 text-primary" />
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+        <CardTitle className="text-xs sm:text-sm font-medium text-card-foreground/80 leading-tight">{title}</CardTitle>
+        <Icon className="w-4 h-4 text-primary flex-shrink-0" />
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold text-card-foreground">{value}</div>
+      <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+        <div className="text-lg sm:text-2xl font-bold text-card-foreground">{value}</div>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           {trend && trendValue && (
             <>
@@ -129,7 +129,7 @@ function MetricCard({ title, value, description, icon: Icon, trend, trendValue, 
               </span>
             </>
           )}
-          <span>{description}</span>
+          <span className="truncate">{description}</span>
         </div>
       </CardContent>
     </Card>
@@ -178,27 +178,27 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gradient">Dashboard</h1>
-          <p className="text-muted-foreground">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gradient">Dashboard</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Bem-vindo de volta, {user?.name}! Aqui está um resumo das suas atividades.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleExportDashboard}>
-            <Download className="w-4 h-4 mr-2" />
-            Exportar
+        <div className="flex gap-2 flex-shrink-0">
+          <Button variant="outline" size="sm" onClick={handleExportDashboard} className="text-xs sm:text-sm">
+            <Download className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Exportar</span>
           </Button>
-          <Button variant="outline" size="sm">
-            <Eye className="w-4 h-4 mr-2" />
-            Visualização
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+            <Eye className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Visualização</span>
           </Button>
         </div>
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Total de Clientes"
           value={metrics.totalClients}
@@ -234,16 +234,16 @@ export default function Dashboard() {
       </div>
 
       {/* Enhanced Charts Section */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-          <TabsTrigger value="payments">Pagamentos</TabsTrigger>
-          <TabsTrigger value="growth">Crescimento</TabsTrigger>
-          <TabsTrigger value="distribution">Distribuição</TabsTrigger>
+      <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
+          <TabsTrigger value="overview" className="text-xs sm:text-sm">Visão Geral</TabsTrigger>
+          <TabsTrigger value="payments" className="text-xs sm:text-sm">Pagamentos</TabsTrigger>
+          <TabsTrigger value="growth" className="text-xs sm:text-sm">Crescimento</TabsTrigger>
+          <TabsTrigger value="distribution" className="text-xs sm:text-sm">Distribuição</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-7">
+        <TabsContent value="overview" className="space-y-4 sm:space-y-6">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-7">
             {/* Main Chart */}
             <Card className="lg:col-span-4 border-0 shadow-primary">
               <CardHeader>
@@ -253,7 +253,7 @@ export default function Dashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={250}>
                   <AreaChart data={revenueData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
@@ -301,8 +301,8 @@ export default function Dashboard() {
           </div>
         </TabsContent>
 
-        <TabsContent value="payments" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
+        <TabsContent value="payments" className="space-y-4 sm:space-y-6">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
             <Card className="border-0 shadow-primary">
               <CardHeader>
                 <CardTitle>Status de Pagamentos</CardTitle>
@@ -392,8 +392,8 @@ export default function Dashboard() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="distribution" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
+        <TabsContent value="distribution" className="space-y-4 sm:space-y-6">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
             <Card className="border-0 shadow-primary">
               <CardHeader>
                 <CardTitle>Distribuição por Status</CardTitle>
@@ -402,7 +402,7 @@ export default function Dashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={250}>
                   <PieChart>
                     <Pie
                       data={statusDistribution}
@@ -480,7 +480,7 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {mockFiliais.map((filial) => {
                 const filialClients = mockClients.filter(c => c.filialId === filial.id);
                 const activeClients = filialClients.filter(c => c.status === 'ativo').length;

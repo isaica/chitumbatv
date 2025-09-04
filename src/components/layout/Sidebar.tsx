@@ -90,6 +90,7 @@ export function AppSidebar() {
     <Sidebar
       className={`${collapsed ? 'w-14' : 'w-64'} transition-all duration-300 bg-sidebar border-sidebar-border`}
       collapsible="icon"
+      side="left"
     >
       <SidebarContent className="bg-sidebar">
         {/* Logo */}

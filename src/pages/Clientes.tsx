@@ -19,6 +19,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
 import { NoClients, NoSearchResults } from '@/components/ui/empty-states';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
+import { MobileTable, MobileCard, MobileActionMenu, StatusBadge } from '@/components/ui/mobile-table';
+import { useResponsive } from '@/hooks/use-responsive';
 
 const clientSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -38,6 +40,7 @@ type ClientFormData = z.infer<typeof clientSchema>;
 
 export default function Clientes() {
   const { user } = useAuth();
+  const { isMobile } = useResponsive();
   const [clients, setClients] = useState<Client[]>(mockClients);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'ativo' | 'inativo' | 'suspenso'>('all');
@@ -194,10 +197,11 @@ export default function Clientes() {
     <div className="space-y-6">
       <Breadcrumbs />
       
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gradient">Gestão de Clientes</h1>
-          <p className="text-muted-foreground">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gradient">Gestão de Clientes</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Gerencie os clientes da Chitumba TV
           </p>
         </div>
@@ -205,7 +209,7 @@ export default function Clientes() {
           <DialogTrigger asChild>
             <Button 
               onClick={() => handleOpenDialog()}
-              className="gradient-primary shadow-primary"
+              className="gradient-primary shadow-primary w-full sm:w-auto"
             >
               <Plus className="w-4 h-4 mr-2" />
               Novo Cliente
@@ -224,7 +228,7 @@ export default function Clientes() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nome Completo</Label>
                   <Input
@@ -251,7 +255,7 @@ export default function Clientes() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="phone">Telefone</Label>
                   <Input
@@ -292,7 +296,7 @@ export default function Clientes() {
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="neighborhood">Bairro</Label>
                   <Input
@@ -331,7 +335,7 @@ export default function Clientes() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="planId">Plano</Label>
                   <Select onValueChange={(value) => setValue('planId', value)}>
@@ -377,7 +381,7 @@ export default function Clientes() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
                 <Button type="button" variant="outline" onClick={handleCloseDialog}>
                   Cancelar
                 </Button>
@@ -396,7 +400,7 @@ export default function Clientes() {
           <CardTitle className="text-lg">Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
@@ -457,7 +461,7 @@ export default function Clientes() {
           <NoClients onCreate={() => handleOpenDialog()} />
         )
       ) : (
-        <PaginationWrapper data={filteredClients} itemsPerPage={10}>
+        <PaginationWrapper data={filteredClients} itemsPerPage={isMobile ? 5 : 10}>
           {(paginatedClients, pagination) => (
             <Card className="border-0 shadow-primary">
               <CardHeader>
@@ -467,92 +471,142 @@ export default function Clientes() {
                 <CardDescription>
                   Lista de clientes da Chitumba TV
                 </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Contato</TableHead>
-                <TableHead>Plano</TableHead>
-                {user?.role === 'admin' && <TableHead>Filial</TableHead>}
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-              <TableBody>
-              {paginatedClients.map((client) => (
-                <TableRow key={client.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <User className="w-4 h-4 text-primary" />
-                      </div>
-                      <div>
-                        <div className="font-medium">{client.name}</div>
-                        <div className="text-sm text-muted-foreground">{client.document}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div>{client.phone}</div>
-                      <div className="text-muted-foreground">{client.email}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {getPlanName(client.planId)}
-                    </Badge>
-                  </TableCell>
-                  {user?.role === 'admin' && (
-                    <TableCell>{getFilialName(client.filialId)}</TableCell>
-                  )}
-                  <TableCell>
-                    <Badge 
-                      variant={
-                        client.status === 'ativo' ? 'default' :
-                        client.status === 'suspenso' ? 'destructive' :
-                        'secondary'
-                      }
-                    >
-                      {client.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Eye className="w-4 h-4 mr-2" />
-                          Ver Detalhes
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenDialog(client)}>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="text-destructive"
-                          onClick={() => handleDelete(client)}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-                </CardContent>
-              </Card>
-            )}
-          </PaginationWrapper>
+              </CardHeader>
+              <CardContent>
+                {isMobile ? (
+                  <MobileTable 
+                    data={paginatedClients}
+                    emptyMessage="Nenhum cliente encontrado"
+                    renderCard={(client) => (
+                      <MobileCard
+                        key={client.id}
+                        actions={
+                          <MobileActionMenu
+                            actions={[
+                              { label: 'Ver Detalhes', onClick: () => {} },
+                              { label: 'Editar', onClick: () => handleOpenDialog(client) },
+                              { label: 'Excluir', onClick: () => handleDelete(client), variant: 'destructive' },
+                            ]}
+                          />
+                        }
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <User className="w-5 h-5 text-primary" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-base truncate">{client.name}</div>
+                              <div className="text-sm text-muted-foreground">{client.document}</div>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <div className="font-medium text-xs text-muted-foreground mb-1">Contato</div>
+                              <div className="truncate">{client.phone}</div>
+                              <div className="text-muted-foreground truncate">{client.email}</div>
+                            </div>
+                            <div>
+                              <div className="font-medium text-xs text-muted-foreground mb-1">Plano</div>
+                              <Badge variant="secondary" className="text-xs">
+                                {getPlanName(client.planId)}
+                              </Badge>
+                            </div>
+                          </div>
+                          
+                          <div className="flex justify-between items-center pt-2">
+                            <div>
+                              {user?.role === 'admin' && (
+                                <div className="text-xs text-muted-foreground">
+                                  {getFilialName(client.filialId)}
+                                </div>
+                              )}
+                            </div>
+                            <StatusBadge status={client.status} />
+                          </div>
+                        </div>
+                      </MobileCard>
+                    )}
+                  />
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Contato</TableHead>
+                        <TableHead>Plano</TableHead>
+                        {user?.role === 'admin' && <TableHead>Filial</TableHead>}
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedClients.map((client) => (
+                        <TableRow key={client.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                <User className="w-4 h-4 text-primary" />
+                              </div>
+                              <div>
+                                <div className="font-medium">{client.name}</div>
+                                <div className="text-sm text-muted-foreground">{client.document}</div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              <div>{client.phone}</div>
+                              <div className="text-muted-foreground">{client.email}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {getPlanName(client.planId)}
+                            </Badge>
+                          </TableCell>
+                          {user?.role === 'admin' && (
+                            <TableCell>{getFilialName(client.filialId)}</TableCell>
+                          )}
+                          <TableCell>
+                            <StatusBadge status={client.status} />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem>
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  Ver Detalhes
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleOpenDialog(client)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="text-destructive"
+                                  onClick={() => handleDelete(client)}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </PaginationWrapper>
         )}
     </div>
   );
