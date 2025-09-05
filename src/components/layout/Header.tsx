@@ -1,4 +1,5 @@
-import { Bell, Search, User, LogOut } from 'lucide-react';
+import { useState } from 'react';
+import { Bell, Search, User, LogOut, Settings, Menu, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -10,12 +11,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { GlobalSearch } from './GlobalSearch';
+import { UserProfile } from '@/components/auth/UserProfile';
 
 export function Header() {
   const { user, logout } = useAuth();
+  const [showProfile, setShowProfile] = useState(false);
 
   const getInitials = (name: string) => {
     return name
@@ -70,12 +74,24 @@ export function Header() {
                 <div>
                   <p className="font-medium">{user?.name}</p>
                   <p className="text-sm text-muted-foreground">{user?.email}</p>
+                  <Badge variant="outline" className="w-fit mt-1">
+                    {user?.role === 'admin' ? (
+                      <>
+                        <Shield className="w-3 h-3 mr-1" />
+                        Administrador
+                      </>
+                    ) : user?.role === 'gerente' ? 'Gerente' : 'Funcionário'}
+                  </Badge>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowProfile(true)}>
                 <User className="w-4 h-4 mr-2" />
                 Meu Perfil
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowProfile(true)}>
+                <Settings className="w-4 h-4 mr-2" />
+                Configurações
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="text-destructive">
@@ -84,6 +100,10 @@ export function Header() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {showProfile && (
+            <UserProfile onClose={() => setShowProfile(false)} />
+          )}
         </div>
       </div>
     </header>
