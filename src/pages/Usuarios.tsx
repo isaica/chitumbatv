@@ -444,12 +444,12 @@ export default function Usuarios() {
         )
       ) : (
         <PaginationWrapper data={filteredUsers} itemsPerPage={10}>
-          {(paginatedUsers, pagination) => (
+          {(paginatedUsers, paginationInfo, paginationElement) => (
             <div className="space-y-4">
               <Card className="border-0 shadow-primary">
                 <CardHeader>
                   <CardTitle>
-                    Usuários ({pagination.totalItems})
+                    Usuários ({paginationInfo.totalItems})
                   </CardTitle>
                   <CardDescription>
                     Lista de usuários do sistema
@@ -546,7 +546,7 @@ export default function Usuarios() {
                   </Table>
                 </CardContent>
               </Card>
-              {pagination}
+              {paginationElement}
             </div>
           )}
         </PaginationWrapper>

@@ -12,7 +12,7 @@ import {
 interface PaginationWrapperProps<T> {
   data: T[];
   itemsPerPage?: number;
-  children: (paginatedData: T[], pagination: PaginationInfo) => React.ReactNode;
+  children: (paginatedData: T[], paginationInfo: PaginationInfo, paginationElement: React.ReactNode) => React.ReactNode;
 }
 
 interface PaginationInfo {
@@ -92,51 +92,51 @@ export function PaginationWrapper<T>({
     setCurrentPage(1);
   }, [data.length]);
 
+  const paginationElement = paginationInfo.totalPages > 1 ? (
+    <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div className="text-sm text-muted-foreground">
+        Mostrando {paginationInfo.startIndex + 1} a {paginationInfo.endIndex} de {paginationInfo.totalItems} resultados
+      </div>
+      
+      <Pagination>
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious 
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+              className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+            />
+          </PaginationItem>
+          
+          {generatePageNumbers().map((page, index) => (
+            <PaginationItem key={index}>
+              {page === 'ellipsis' ? (
+                <PaginationEllipsis />
+              ) : (
+                <PaginationLink
+                  onClick={() => handlePageChange(page as number)}
+                  isActive={currentPage === page}
+                  className="cursor-pointer"
+                >
+                  {page}
+                </PaginationLink>
+              )}
+            </PaginationItem>
+          ))}
+          
+          <PaginationItem>
+            <PaginationNext 
+              onClick={() => handlePageChange(Math.min(paginationInfo.totalPages, currentPage + 1))}
+              className={currentPage === paginationInfo.totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-4">
-      {children(paginatedData, paginationInfo)}
-      
-      {paginationInfo.totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="text-sm text-muted-foreground">
-            Mostrando {paginationInfo.startIndex + 1} a {paginationInfo.endIndex} de {paginationInfo.totalItems} resultados
-          </div>
-          
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                />
-              </PaginationItem>
-              
-              {generatePageNumbers().map((page, index) => (
-                <PaginationItem key={index}>
-                  {page === 'ellipsis' ? (
-                    <PaginationEllipsis />
-                  ) : (
-                    <PaginationLink
-                      onClick={() => handlePageChange(page as number)}
-                      isActive={currentPage === page}
-                      className="cursor-pointer"
-                    >
-                      {page}
-                    </PaginationLink>
-                  )}
-                </PaginationItem>
-              ))}
-              
-              <PaginationItem>
-                <PaginationNext 
-                  onClick={() => handlePageChange(Math.min(paginationInfo.totalPages, currentPage + 1))}
-                  className={currentPage === paginationInfo.totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
+      {children(paginatedData, paginationInfo, paginationElement)}
     </div>
   );
 }

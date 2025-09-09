@@ -247,12 +247,13 @@ export default function Mensalidades() {
         )
       ) : (
         <PaginationWrapper data={filteredMensalidades} itemsPerPage={15}>
-          {(paginatedMensalidades, pagination) => (
-            <Card className="border-0 shadow-primary">
-              <CardHeader>
-                <CardTitle>
-                  Mensalidades ({pagination.totalItems})
-                </CardTitle>
+          {(paginatedMensalidades, paginationInfo, paginationElement) => (
+            <div className="space-y-4">
+              <Card className="border-0 shadow-primary">
+                <CardHeader>
+                  <CardTitle>
+                    Mensalidades ({paginationInfo.totalItems})
+                  </CardTitle>
                 <CardDescription>
                   Lista de mensalidades dos clientes
                 </CardDescription>
@@ -328,6 +329,8 @@ export default function Mensalidades() {
                 </Table>
               </CardContent>
             </Card>
+            {paginationElement}
+            </div>
           )}
         </PaginationWrapper>
       )}

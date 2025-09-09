@@ -301,12 +301,13 @@ export default function Filiais() {
         )
       ) : (
         <PaginationWrapper data={filteredFiliais} itemsPerPage={10}>
-          {(paginatedFiliais, pagination) => (
-            <Card className="border-0 shadow-primary">
-              <CardHeader>
-                <CardTitle>
-                  Filiais ({pagination.totalItems})
-                </CardTitle>
+          {(paginatedFiliais, paginationInfo, paginationElement) => (
+            <div className="space-y-4">
+              <Card className="border-0 shadow-primary">
+                <CardHeader>
+                  <CardTitle>
+                    Filiais ({paginationInfo.totalItems})
+                  </CardTitle>
                 <CardDescription>
                   Lista de todas as filiais da Chitumba TV
                 </CardDescription>
@@ -377,6 +378,8 @@ export default function Filiais() {
                 </Table>
               </CardContent>
             </Card>
+            {paginationElement}
+            </div>
           )}
         </PaginationWrapper>
       )}

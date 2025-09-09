@@ -462,12 +462,13 @@ export default function Clientes() {
         )
       ) : (
         <PaginationWrapper data={filteredClients} itemsPerPage={isMobile ? 5 : 10}>
-          {(paginatedClients, pagination) => (
-            <Card className="border-0 shadow-primary">
-              <CardHeader>
-                <CardTitle>
-                  Clientes ({pagination.totalItems})
-                </CardTitle>
+          {(paginatedClients, paginationInfo, paginationElement) => (
+            <div className="space-y-4">
+              <Card className="border-0 shadow-primary">
+                <CardHeader>
+                  <CardTitle>
+                    Clientes ({paginationInfo.totalItems})
+                  </CardTitle>
                 <CardDescription>
                   Lista de clientes da Chitumba TV
                 </CardDescription>
@@ -605,9 +606,11 @@ export default function Clientes() {
                 )}
               </CardContent>
             </Card>
+            {paginationElement}
+            </div>
           )}
         </PaginationWrapper>
-        )}
+      )}
     </div>
   );
 }
