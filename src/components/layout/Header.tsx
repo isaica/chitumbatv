@@ -15,11 +15,10 @@ import { Badge } from '@/components/ui/badge';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { GlobalSearch } from './GlobalSearch';
-import { UserProfile } from '@/components/auth/UserProfile';
+
 
 export function Header() {
   const { user, logout } = useAuth();
-  const [showProfile, setShowProfile] = useState(false);
 
   const getInitials = (name: string) => {
     return name
@@ -85,25 +84,12 @@ export function Header() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setShowProfile(true)}>
-                <User className="w-4 h-4 mr-2" />
-                Meu Perfil
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowProfile(true)}>
-                <Settings className="w-4 h-4 mr-2" />
-                Configurações
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="text-destructive">
                 <LogOut className="w-4 h-4 mr-2" />
                 Sair
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {showProfile && (
-            <UserProfile onClose={() => setShowProfile(false)} />
-          )}
         </div>
       </div>
     </header>
