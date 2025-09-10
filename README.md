@@ -1,8 +1,7 @@
-# Welcome to your Lovable project
+# Welcome to your Lovable project Chitumba
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/cc0deb30-f43d-4226-b0de-c849f1d2eb83
 
 ## How can I edit this code?
 
