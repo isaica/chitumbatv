@@ -13,7 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { mockClients, mockFiliais, mockPlans } from '@/data/mock';
+import { mockClients, mockFiliais } from '@/data/mock';
 import { Client } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
@@ -31,7 +31,6 @@ const clientSchema = z.object({
   city: z.string().min(1, 'Cidade é obrigatória'),
   province: z.string().min(1, 'Província é obrigatória'),
   document: z.string().min(1, 'Documento é obrigatório'),
-  planId: z.string().min(1, 'Plano é obrigatório'),
   filialId: z.string().min(1, 'Filial é obrigatória'),
   status: z.enum(['ativo', 'inativo', 'suspenso']),
 });
@@ -45,7 +44,6 @@ export default function Clientes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'ativo' | 'inativo' | 'suspenso'>('all');
   const [filialFilter, setFilialFilter] = useState<string>('all');
-  const [planFilter, setPlanFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const { toast } = useToast();
@@ -76,20 +74,15 @@ export default function Clientes() {
                          client.phone.includes(searchTerm);
     const matchesStatus = statusFilter === 'all' || client.status === statusFilter;
     const matchesFilial = filialFilter === 'all' || client.filialId === filialFilter;
-    const matchesPlan = planFilter === 'all' || client.planId === planFilter;
     
     // Non-admin users can only see their filial's clients
     const hasAccess = user?.role === 'admin' || client.filialId === user?.filialId;
     
-    return matchesSearch && matchesStatus && matchesFilial && matchesPlan && hasAccess;
+    return matchesSearch && matchesStatus && matchesFilial && hasAccess;
   });
 
   const getFilialName = (filialId: string) => {
     return mockFiliais.find(f => f.id === filialId)?.name || 'N/A';
-  };
-
-  const getPlanName = (planId: string) => {
-    return mockPlans.find(p => p.id === planId)?.name || 'N/A';
   };
 
   const handleOpenDialog = (client?: Client) => {
@@ -103,7 +96,6 @@ export default function Clientes() {
       setValue('city', client.address.city);
       setValue('province', client.address.province);
       setValue('document', client.document);
-      setValue('planId', client.planId);
       setValue('filialId', client.filialId);
       setValue('status', client.status);
     } else {
@@ -140,7 +132,6 @@ export default function Clientes() {
                 province: data.province,
               },
               document: data.document,
-              planId: data.planId,
               filialId: data.filialId,
               status: data.status,
             }
@@ -164,7 +155,6 @@ export default function Clientes() {
           province: data.province,
         },
         document: data.document,
-        planId: data.planId,
         filialId: data.filialId,
         status: data.status,
         createdAt: new Date(),
@@ -190,7 +180,6 @@ export default function Clientes() {
     setSearchTerm('');
     setStatusFilter('all');
     setFilialFilter('all');
-    setPlanFilter('all');
   };
 
   return (
@@ -335,22 +324,7 @@ export default function Clientes() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="planId">Plano</Label>
-                  <Select onValueChange={(value) => setValue('planId', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o plano" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mockPlans.map((plan) => (
-                        <SelectItem key={plan.id} value={plan.id}>
-                          {plan.name} - {plan.price.toLocaleString()} AOA
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="filialId">Filial</Label>
                   <Select onValueChange={(value) => setValue('filialId', value)}>
@@ -400,7 +374,7 @@ export default function Clientes() {
           <CardTitle className="text-lg">Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
@@ -436,26 +410,13 @@ export default function Clientes() {
                 </SelectContent>
               </Select>
             )}
-            <Select value={planFilter} onValueChange={setPlanFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Plano" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Planos</SelectItem>
-                {mockPlans.map((plan) => (
-                  <SelectItem key={plan.id} value={plan.id}>
-                    {plan.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
         </CardContent>
       </Card>
 
       {/* Results */}
       {filteredClients.length === 0 ? (
-        searchTerm || statusFilter !== 'all' || filialFilter !== 'all' || planFilter !== 'all' ? (
+        searchTerm || statusFilter !== 'all' || filialFilter !== 'all' ? (
           <NoSearchResults searchTerm={searchTerm} onClear={clearSearch} />
         ) : (
           <NoClients onCreate={() => handleOpenDialog()} />
@@ -508,12 +469,6 @@ export default function Clientes() {
                               <div className="truncate">{client.phone}</div>
                               <div className="text-muted-foreground truncate">{client.email}</div>
                             </div>
-                            <div>
-                              <div className="font-medium text-xs text-muted-foreground mb-1">Plano</div>
-                              <Badge variant="secondary" className="text-xs">
-                                {getPlanName(client.planId)}
-                              </Badge>
-                            </div>
                           </div>
                           
                           <div className="flex justify-between items-center pt-2">
@@ -533,14 +488,13 @@ export default function Clientes() {
                 ) : (
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Cliente</TableHead>
-                        <TableHead>Contato</TableHead>
-                        <TableHead>Plano</TableHead>
-                        {user?.role === 'admin' && <TableHead>Filial</TableHead>}
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
-                      </TableRow>
+                        <TableRow>
+                          <TableHead>Cliente</TableHead>
+                          <TableHead>Contato</TableHead>
+                          {user?.role === 'admin' && <TableHead>Filial</TableHead>}
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
                     </TableHeader>
                     <TableBody>
                       {paginatedClients.map((client) => (
@@ -561,16 +515,11 @@ export default function Clientes() {
                               <div>{client.phone}</div>
                               <div className="text-muted-foreground">{client.email}</div>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">
-                              {getPlanName(client.planId)}
-                            </Badge>
-                          </TableCell>
-                          {user?.role === 'admin' && (
-                            <TableCell>{getFilialName(client.filialId)}</TableCell>
-                          )}
-                          <TableCell>
+                           </TableCell>
+                           {user?.role === 'admin' && (
+                             <TableCell>{getFilialName(client.filialId)}</TableCell>
+                           )}
+                           <TableCell>
                             <StatusBadge status={client.status} />
                           </TableCell>
                           <TableCell className="text-right">

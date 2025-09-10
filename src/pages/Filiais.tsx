@@ -25,6 +25,7 @@ const filialSchema = z.object({
   phone: z.string().min(1, 'Telefone é obrigatório'),
   email: z.string().email('Email inválido'),
   responsavel: z.string().min(1, 'Responsável é obrigatório'),
+  monthlyPrice: z.number().min(0, 'Preço deve ser maior que zero'),
   status: z.enum(['ativa', 'inativa']),
 });
 
@@ -99,7 +100,13 @@ export default function Filiais() {
       // Create new filial
       const newFilial: Filial = {
         id: Date.now().toString(),
-        ...data,
+        name: data.name,
+        address: data.address,
+        phone: data.phone,
+        email: data.email,
+        responsavel: data.responsavel,
+        monthlyPrice: data.monthlyPrice,
+        status: data.status,
         createdAt: new Date(),
       };
       setFiliais(prev => [...prev, newFilial]);
@@ -236,17 +243,32 @@ export default function Filiais() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select onValueChange={(value: 'ativa' | 'inativa') => setValue('status', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ativa">Ativa</SelectItem>
-                    <SelectItem value="inativa">Inativa</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="monthlyPrice">Preço Mensal (AOA)</Label>
+                  <Input
+                    id="monthlyPrice"
+                    type="number"
+                    placeholder="2500"
+                    {...register('monthlyPrice', { valueAsNumber: true })}
+                    className={errors.monthlyPrice ? 'border-destructive' : ''}
+                  />
+                  {errors.monthlyPrice && (
+                    <p className="text-sm text-destructive">{errors.monthlyPrice.message}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select onValueChange={(value: 'ativa' | 'inativa') => setValue('status', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ativa">Ativa</SelectItem>
+                      <SelectItem value="inativa">Inativa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
