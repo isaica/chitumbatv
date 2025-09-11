@@ -3,7 +3,7 @@
 ## Project info
 
 
-## How can I edit this code?
+## Devo eliminar algumas info depois de passar ao Trae
 
 There are several ways of editing your application.
 
