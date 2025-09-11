@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal, User } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal, User, CreditCard, AlertCircle, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,8 +13,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { mockClients, mockFiliais } from '@/data/mock';
+import { mockClients, mockFiliais, mockMensalidades } from '@/data/mock';
 import { Client } from '@/types';
+import { calculateClientPaymentStatus, ClientPaymentStatus, getStatusLabel, getStatusColor } from '@/utils/paymentStatus';
+import { ClientDetailsModal } from '@/components/ui/client-details-modal';
 import { useAuth } from '@/contexts/AuthContext';
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
 import { NoClients, NoSearchResults } from '@/components/ui/empty-states';
@@ -42,10 +44,13 @@ export default function Clientes() {
   const { isMobile } = useResponsive();
   const [clients, setClients] = useState<Client[]>(mockClients);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'ativo' | 'inativo' | 'suspenso'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pago' | 'atrasado' | 'inadimplente' | 'suspenso' | 'inativo'>('all');
   const [filialFilter, setFilialFilter] = useState<string>('all');
+  const [debtFilter, setDebtFilter] = useState<'all' | 'no_debt' | 'with_debt'>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [detailsClient, setDetailsClient] = useState<Client | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const { toast } = useToast();
 
   const {
@@ -68,17 +73,33 @@ export default function Clientes() {
     ? mockFiliais 
     : mockFiliais.filter(f => f.id === user?.filialId);
 
-  const filteredClients = clients.filter((client) => {
+  // Calculate payment status for all clients
+  const clientsWithPaymentStatus = useMemo(() => {
+    return clients.map(client => ({
+      ...client,
+      paymentStatus: calculateClientPaymentStatus(client, mockMensalidades)
+    }));
+  }, [clients]);
+
+  const filteredClients = clientsWithPaymentStatus.filter((client) => {
     const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          client.phone.includes(searchTerm);
-    const matchesStatus = statusFilter === 'all' || client.status === statusFilter;
+    
+    // Payment status filter
+    const matchesStatus = statusFilter === 'all' || client.paymentStatus.status === statusFilter;
+    
     const matchesFilial = filialFilter === 'all' || client.filialId === filialFilter;
+    
+    // Debt filter
+    const matchesDebt = debtFilter === 'all' || 
+                        (debtFilter === 'no_debt' && client.paymentStatus.totalDebt === 0) ||
+                        (debtFilter === 'with_debt' && client.paymentStatus.totalDebt > 0);
     
     // Non-admin users can only see their filial's clients
     const hasAccess = user?.role === 'admin' || client.filialId === user?.filialId;
     
-    return matchesSearch && matchesStatus && matchesFilial && hasAccess;
+    return matchesSearch && matchesStatus && matchesFilial && matchesDebt && hasAccess;
   });
 
   const getFilialName = (filialId: string) => {
@@ -180,6 +201,28 @@ export default function Clientes() {
     setSearchTerm('');
     setStatusFilter('all');
     setFilialFilter('all');
+    setDebtFilter('all');
+  };
+
+  const handleViewDetails = (client: Client) => {
+    setDetailsClient(client);
+    setIsDetailsOpen(true);
+  };
+
+  const handleRegisterPayment = (clientId: string) => {
+    // Simular registro de pagamento - aqui seria integrado com API real
+    toast({
+      title: 'Pagamento registrado',
+      description: 'O pagamento foi registrado com sucesso.',
+    });
+    setIsDetailsOpen(false);
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-AO', {
+      style: 'currency',
+      currency: 'AOA'
+    }).format(value);
   };
 
   return (
@@ -374,7 +417,7 @@ export default function Clientes() {
           <CardTitle className="text-lg">Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
@@ -386,13 +429,25 @@ export default function Clientes() {
             </div>
             <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
               <SelectTrigger>
-                <SelectValue placeholder="Status" />
+                <SelectValue placeholder="Status de Pagamento" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="ativo">Ativo</SelectItem>
-                <SelectItem value="inativo">Inativo</SelectItem>
+                <SelectItem value="pago">Em Dia</SelectItem>
+                <SelectItem value="atrasado">Atrasado</SelectItem>
+                <SelectItem value="inadimplente">Inadimplente</SelectItem>
                 <SelectItem value="suspenso">Suspenso</SelectItem>
+                <SelectItem value="inativo">Inativo</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={debtFilter} onValueChange={(value: any) => setDebtFilter(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Situação de Dívida" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Situações</SelectItem>
+                <SelectItem value="no_debt">Sem Dívidas</SelectItem>
+                <SelectItem value="with_debt">Com Dívidas</SelectItem>
               </SelectContent>
             </Select>
             {user?.role === 'admin' && (
@@ -416,7 +471,7 @@ export default function Clientes() {
 
       {/* Results */}
       {filteredClients.length === 0 ? (
-        searchTerm || statusFilter !== 'all' || filialFilter !== 'all' ? (
+        searchTerm || statusFilter !== 'all' || filialFilter !== 'all' || debtFilter !== 'all' ? (
           <NoSearchResults searchTerm={searchTerm} onClear={clearSearch} />
         ) : (
           <NoClients onCreate={() => handleOpenDialog()} />
@@ -445,113 +500,191 @@ export default function Clientes() {
                         actions={
                           <MobileActionMenu
                             actions={[
-                              { label: 'Ver Detalhes', onClick: () => {} },
-                              { label: 'Editar', onClick: () => handleOpenDialog(client) },
-                              { label: 'Excluir', onClick: () => handleDelete(client), variant: 'destructive' },
+                              {
+                                label: 'Ver Detalhes',
+                                onClick: () => handleViewDetails(client),
+                              },
+                              ...(client.paymentStatus.totalDebt > 0 ? [{
+                                label: 'Registrar Pagamento',
+                                onClick: () => handleRegisterPayment(client.id),
+                              }] : []),
+                              {
+                                label: 'Editar',
+                                onClick: () => handleOpenDialog(client),
+                              },
+                              {
+                                label: 'Excluir',
+                                onClick: () => handleDelete(client),
+                                variant: 'destructive' as const,
+                              },
                             ]}
                           />
                         }
                       >
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                              <User className="w-5 h-5 text-primary" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="font-medium text-base truncate">{client.name}</div>
-                              <div className="text-sm text-muted-foreground">{client.document}</div>
-                            </div>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-semibold text-lg">{client.name}</h3>
+                            <Badge className={`${getStatusColor(client.paymentStatus.status)} border text-xs`}>
+                              {getStatusLabel(client.paymentStatus.status)}
+                            </Badge>
                           </div>
                           
                           <div className="grid grid-cols-2 gap-3 text-sm">
                             <div>
-                              <div className="font-medium text-xs text-muted-foreground mb-1">Contato</div>
-                              <div className="truncate">{client.phone}</div>
-                              <div className="text-muted-foreground truncate">{client.email}</div>
+                              <p className="text-muted-foreground">Telefone</p>
+                              <p className="font-medium">{client.phone}</p>
                             </div>
-                          </div>
-                          
-                          <div className="flex justify-between items-center pt-2">
                             <div>
-                              {user?.role === 'admin' && (
-                                <div className="text-xs text-muted-foreground">
-                                  {getFilialName(client.filialId)}
-                                </div>
-                              )}
+                              <p className="text-muted-foreground">Email</p>
+                              <p className="font-medium truncate">{client.email}</p>
                             </div>
-                            <StatusBadge status={client.status} />
+                            <div>
+                              <p className="text-muted-foreground">Filial</p>
+                              <p className="font-medium">{getFilialName(client.filialId)}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Documento</p>
+                              <p className="font-medium">{client.document}</p>
+                            </div>
                           </div>
+
+                          {client.paymentStatus.totalDebt > 0 && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <AlertCircle className="w-4 h-4 text-red-600" />
+                                  <span className="text-sm font-medium text-red-700">Dívida Pendente</span>
+                                </div>
+                                <span className="text-sm font-bold text-red-600">
+                                  {formatCurrency(client.paymentStatus.totalDebt)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-red-600">
+                                {client.paymentStatus.overdueCount} mês(es) em atraso
+                              </p>
+                            </div>
+                          )}
+
+                          {client.paymentStatus.status === 'pago' && (
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+                              <CreditCard className="w-4 h-4 text-green-600" />
+                              <span className="text-sm font-medium text-green-700">Todas as mensalidades em dia</span>
+                            </div>
+                          )}
                         </div>
                       </MobileCard>
                     )}
                   />
                 ) : (
-                  <Table>
-                    <TableHeader>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
                           <TableHead>Cliente</TableHead>
                           <TableHead>Contato</TableHead>
-                          {user?.role === 'admin' && <TableHead>Filial</TableHead>}
-                          <TableHead>Status</TableHead>
+                          <TableHead>Status de Pagamento</TableHead>
+                          <TableHead>Dívida</TableHead>
+                          <TableHead>Filial</TableHead>
+                          <TableHead>Documento</TableHead>
                           <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedClients.map((client) => (
-                        <TableRow key={client.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                <User className="w-4 h-4 text-primary" />
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedClients.map((client) => (
+                          <TableRow key={client.id} className="hover:bg-muted/50">
+                            <TableCell>
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/70 rounded-full flex items-center justify-center text-primary-foreground font-semibold text-sm">
+                                  {client.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                                </div>
+                                <div>
+                                  <p className="font-medium">{client.name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Cliente desde {new Date(client.createdAt).toLocaleDateString('pt-BR')}
+                                  </p>
+                                </div>
                               </div>
-                              <div>
-                                <div className="font-medium">{client.name}</div>
-                                <div className="text-sm text-muted-foreground">{client.document}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium">{client.phone}</p>
+                                <p className="text-sm text-muted-foreground">{client.email}</p>
                               </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">
-                              <div>{client.phone}</div>
-                              <div className="text-muted-foreground">{client.email}</div>
-                            </div>
-                           </TableCell>
-                           {user?.role === 'admin' && (
-                             <TableCell>{getFilialName(client.filialId)}</TableCell>
-                           )}
-                           <TableCell>
-                            <StatusBadge status={client.status} />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem>
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  Ver Detalhes
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleOpenDialog(client)}>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  className="text-destructive"
-                                  onClick={() => handleDelete(client)}
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Excluir
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-2">
+                                <Badge className={`${getStatusColor(client.paymentStatus.status)} border`}>
+                                  {getStatusLabel(client.paymentStatus.status)}
+                                </Badge>
+                                {client.paymentStatus.overdueCount > 0 && (
+                                  <div className="flex items-center gap-1 text-xs text-red-600">
+                                    <AlertCircle className="w-3 h-3" />
+                                    <span>{client.paymentStatus.overdueCount} mês(es)</span>
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {client.paymentStatus.totalDebt > 0 ? (
+                                <div className="space-y-1">
+                                  <p className="font-semibold text-red-600">
+                                    {formatCurrency(client.paymentStatus.totalDebt)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {client.paymentStatus.overdueMonths.slice(0, 2).join(', ')}
+                                    {client.paymentStatus.overdueMonths.length > 2 && '...'}
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 text-green-600">
+                                  <CreditCard className="w-4 h-4" />
+                                  <span className="text-sm font-medium">Em dia</span>
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-medium">{getFilialName(client.filialId)}</span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-mono text-sm">{client.document}</span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleViewDetails(client)}>
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    Ver Detalhes
+                                  </DropdownMenuItem>
+                                  {client.paymentStatus.totalDebt > 0 && (
+                                    <DropdownMenuItem onClick={() => handleRegisterPayment(client.id)}>
+                                      <CreditCard className="w-4 h-4 mr-2" />
+                                      Registrar Pagamento
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem onClick={() => handleOpenDialog(client)}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Editar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    className="text-destructive"
+                                    onClick={() => handleDelete(client)}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Excluir
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -560,6 +693,16 @@ export default function Clientes() {
           )}
         </PaginationWrapper>
       )}
+
+      {/* Client Details Modal */}
+      <ClientDetailsModal
+        client={detailsClient}
+        isOpen={isDetailsOpen}
+        onClose={() => setIsDetailsOpen(false)}
+        paymentStatus={detailsClient ? calculateClientPaymentStatus(detailsClient, mockMensalidades) : {} as ClientPaymentStatus}
+        mensalidades={mockMensalidades}
+        onRegisterPayment={handleRegisterPayment}
+      />
     </div>
   );
 }
