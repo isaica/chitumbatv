@@ -12,20 +12,10 @@ export function calculateClientPaymentStatus(
   client: Client, 
   mensalidades: Mensalidade[]
 ): ClientPaymentStatus {
-  // Se cliente está inativo ou suspenso, retorna status direto
+  // Se cliente está inativo, retorna status direto
   if (client.status === 'inativo') {
     return {
       status: 'inativo',
-      overdueMonths: [],
-      totalDebt: 0,
-      currentMonthPaid: false,
-      overdueCount: 0
-    };
-  }
-
-  if (client.status === 'suspenso') {
-    return {
-      status: 'suspenso',
       overdueMonths: [],
       totalDebt: 0,
       currentMonthPaid: false,
@@ -56,7 +46,40 @@ export function calculateClientPaymentStatus(
   const totalDebt = overdueMensalidades.reduce((total, m) => total + m.amount, 0);
   const overdueCount = overdueMensalidades.length;
 
-  // Determina o status
+  // REGRA DE NEGÓCIO: Suspensão automática após 3+ meses em atraso
+  if (overdueCount >= 3) {
+    return {
+      status: 'suspenso',
+      overdueMonths,
+      totalDebt,
+      currentMonthPaid,
+      overdueCount
+    };
+  }
+
+  // Se cliente foi manualmente suspenso mas tem pagamento em dia, reativa automaticamente
+  if (client.status === 'suspenso' && overdueCount === 0 && currentMonthPaid) {
+    return {
+      status: 'pago',
+      overdueMonths: [],
+      totalDebt: 0,
+      currentMonthPaid: true,
+      overdueCount: 0
+    };
+  }
+
+  // Se cliente foi manualmente suspenso e ainda tem dívidas, mantém suspenso
+  if (client.status === 'suspenso') {
+    return {
+      status: 'suspenso',
+      overdueMonths,
+      totalDebt,
+      currentMonthPaid,
+      overdueCount
+    };
+  }
+
+  // Determina o status baseado na situação de pagamento
   let status: ClientPaymentStatus['status'];
   
   if (!currentMonthPaid) {
