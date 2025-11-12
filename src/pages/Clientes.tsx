@@ -14,9 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { mockClients, mockFiliais, mockMensalidades } from '@/data/mock';
-import { Client } from '@/types';
+import { Client, Mensalidade } from '@/types';
 import { calculateClientPaymentStatus, ClientPaymentStatus, getStatusLabel, getStatusColor } from '@/utils/paymentStatus';
 import { ClientDetailsModal } from '@/components/ui/client-details-modal';
+import { QuickPaymentModal } from '@/components/ui/quick-payment-modal';
 import { useAuth } from '@/contexts/AuthContext';
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
 import { NoClients, NoSearchResults } from '@/components/ui/empty-states';
@@ -43,6 +44,7 @@ export default function Clientes() {
   const { user } = useAuth();
   const { isMobile } = useResponsive();
   const [clients, setClients] = useState<Client[]>(mockClients);
+  const [mensalidades, setMensalidades] = useState<Mensalidade[]>(mockMensalidades);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pago' | 'atrasado' | 'inadimplente' | 'suspenso' | 'inativo'>('all');
   const [filialFilter, setFilialFilter] = useState<string>('all');
@@ -51,6 +53,8 @@ export default function Clientes() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [detailsClient, setDetailsClient] = useState<Client | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [paymentClient, setPaymentClient] = useState<Client | null>(null);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const { toast } = useToast();
 
   const {
@@ -77,9 +81,9 @@ export default function Clientes() {
   const clientsWithPaymentStatus = useMemo(() => {
     return clients.map(client => ({
       ...client,
-      paymentStatus: calculateClientPaymentStatus(client, mockMensalidades)
+      paymentStatus: calculateClientPaymentStatus(client, mensalidades)
     }));
-  }, [clients]);
+  }, [clients, mensalidades]);
 
   const filteredClients = clientsWithPaymentStatus.filter((client) => {
     const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -210,12 +214,25 @@ export default function Clientes() {
   };
 
   const handleRegisterPayment = (clientId: string) => {
-    // Simular registro de pagamento - aqui seria integrado com API real
+    const client = clients.find(c => c.id === clientId);
+    if (client) {
+      setPaymentClient(client);
+      setIsPaymentModalOpen(true);
+    }
+  };
+
+  const handleConfirmPayment = (mensalidadeIds: string[]) => {
+    // Update mensalidades to mark as paid
+    setMensalidades(prev => prev.map(m => 
+      mensalidadeIds.includes(m.id)
+        ? { ...m, status: 'pago' as const, paidAt: new Date() }
+        : m
+    ));
+
     toast({
       title: 'Pagamento registrado',
-      description: 'O pagamento foi registrado com sucesso.',
+      description: `${mensalidadeIds.length} ${mensalidadeIds.length === 1 ? 'mensalidade foi registrada' : 'mensalidades foram registradas'} com sucesso.`,
     });
-    setIsDetailsOpen(false);
   };
 
   const formatCurrency = (value: number) => {
@@ -699,10 +716,24 @@ export default function Clientes() {
         client={detailsClient}
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
-        paymentStatus={detailsClient ? calculateClientPaymentStatus(detailsClient, mockMensalidades) : {} as ClientPaymentStatus}
-        mensalidades={mockMensalidades}
+        paymentStatus={detailsClient ? calculateClientPaymentStatus(detailsClient, mensalidades) : {} as ClientPaymentStatus}
+        mensalidades={mensalidades}
         onRegisterPayment={handleRegisterPayment}
       />
+
+      {/* Quick Payment Modal */}
+      {paymentClient && (
+        <QuickPaymentModal
+          open={isPaymentModalOpen}
+          onClose={() => {
+            setIsPaymentModalOpen(false);
+            setPaymentClient(null);
+          }}
+          client={paymentClient}
+          mensalidades={mensalidades}
+          onPayment={handleConfirmPayment}
+        />
+      )}
     </div>
   );
 }

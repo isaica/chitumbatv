@@ -8,7 +8,8 @@ import {
   UserCog,
   BarChart3,
   ChevronLeft,
-  Tv
+  Tv,
+  BadgeDollarSign
 } from 'lucide-react';
 import {
   Sidebar,
@@ -23,6 +24,9 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
+import { mockClients, mockMensalidades } from '@/data/mock';
+import { calculateClientPaymentStatus } from '@/utils/paymentStatus';
+import { Badge } from '@/components/ui/badge';
 
 const menuItems = [
   {
@@ -38,16 +42,24 @@ const menuItems = [
     roles: ['admin']
   },
   {
+    title: 'Preços',
+    url: '/precos',
+    icon: BadgeDollarSign,
+    roles: ['admin']
+  },
+  {
     title: 'Clientes',
     url: '/clientes',
     icon: Users,
-    roles: ['admin', 'gerente', 'funcionario']
+    roles: ['admin', 'gerente', 'funcionario'],
+    badge: true
   },
   {
     title: 'Mensalidades',
     url: '/mensalidades',
     icon: CreditCard,
-    roles: ['admin', 'gerente', 'funcionario']
+    roles: ['admin', 'gerente', 'funcionario'],
+    badge: true
   },
   {
     title: 'Usuários',
@@ -69,6 +81,30 @@ export function AppSidebar() {
   const { user } = useAuth();
   const currentPath = location.pathname;
   const collapsed = !open;
+
+  // Calculate badges
+  const userFilialClients = user?.role === 'admin' 
+    ? mockClients 
+    : mockClients.filter(c => c.filialId === user?.filialId);
+
+  // Count clients with payment issues
+  const clientsWithIssues = userFilialClients.filter(client => {
+    const clientMensalidades = mockMensalidades.filter(m => m.clientId === client.id);
+    const status = calculateClientPaymentStatus(client, clientMensalidades);
+    return status.status === 'inadimplente' || status.status === 'suspenso';
+  }).length;
+
+  // Count overdue mensalidades
+  const overdueMensalidades = mockMensalidades.filter(m => {
+    const client = userFilialClients.find(c => c.id === m.clientId);
+    return client && m.status === 'atrasado';
+  }).length;
+
+  const getBadgeCount = (title: string) => {
+    if (title === 'Clientes') return clientsWithIssues;
+    if (title === 'Mensalidades') return overdueMensalidades;
+    return 0;
+  };
 
   const filteredMenuItems = menuItems.filter(item => 
     user?.role && item.roles.includes(user.role)
@@ -117,16 +153,31 @@ export function AppSidebar() {
           
           <SidebarGroupContent>
             <SidebarMenu>
-              {filteredMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} className={getNavCls(item.url)}>
-                      <item.icon className={`${collapsed ? 'w-5 h-5' : 'w-4 h-4 mr-3'} flex-shrink-0`} />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {filteredMenuItems.map((item) => {
+                const badgeCount = item.badge ? getBadgeCount(item.title) : 0;
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink to={item.url} className={getNavCls(item.url)}>
+                        <item.icon className={`${collapsed ? 'w-5 h-5' : 'w-4 h-4 mr-3'} flex-shrink-0`} />
+                        {!collapsed && (
+                          <div className="flex items-center justify-between flex-1">
+                            <span>{item.title}</span>
+                            {badgeCount > 0 && (
+                              <Badge 
+                                variant="destructive" 
+                                className="ml-2 h-5 min-w-[20px] flex items-center justify-center px-1.5"
+                              >
+                                {badgeCount}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

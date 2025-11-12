@@ -12,6 +12,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/components/ui/notification-system';
 import ActionHistory, { ActionRecord } from '@/components/ui/action-history';
 import { exportToPDF } from '@/utils/export';
+import { calculateClientPaymentStatus } from '@/utils/paymentStatus';
+import { useNavigate } from 'react-router-dom';
 
 // Mock data for enhanced charts
 const paymentData = [
@@ -139,12 +141,36 @@ function MetricCard({ title, value, description, icon: Icon, trend, trendValue, 
 export default function Dashboard() {
   const { user } = useAuth();
   const { addNotification } = useNotifications();
+  const navigate = useNavigate();
   const metrics = mockDashboardMetrics;
 
   // Filter data based on user role and filial
   const userFilials = user?.role === 'admin' 
     ? mockFiliais 
     : mockFiliais.filter(f => f.id === user?.filialId);
+
+  const userFilialClients = user?.role === 'admin' 
+    ? mockClients 
+    : mockClients.filter(c => c.filialId === user?.filialId);
+
+  // Calculate critical clients
+  const criticalClients = userFilialClients
+    .map(client => {
+      const clientMensalidades = mockMensalidades.filter(m => m.clientId === client.id);
+      const paymentStatus = calculateClientPaymentStatus(client, clientMensalidades);
+      return { client, paymentStatus };
+    })
+    .filter(({ paymentStatus }) => 
+      paymentStatus.status === 'suspenso' || paymentStatus.overdueCount >= 2
+    )
+    .sort((a, b) => b.paymentStatus.overdueCount - a.paymentStatus.overdueCount)
+    .slice(0, 5);
+
+  const totalOverdueClients = userFilialClients.filter(client => {
+    const clientMensalidades = mockMensalidades.filter(m => m.clientId === client.id);
+    const status = calculateClientPaymentStatus(client, clientMensalidades);
+    return status.status === 'inadimplente' || status.status === 'suspenso';
+  }).length;
 
   const recentActivities = mockActivities.slice(0, 5);
 
@@ -197,6 +223,72 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Critical Clients Alert */}
+      {criticalClients.length > 0 && (
+        <Card className="border-l-4 border-l-destructive bg-destructive/5">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+                <CardTitle className="text-lg">Clientes que Requerem Atenção</CardTitle>
+              </div>
+              <Badge variant="destructive" className="text-sm">
+                {totalOverdueClients} Inadimplentes
+              </Badge>
+            </div>
+            <CardDescription>
+              Clientes com pagamentos críticos ou suspensos
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {criticalClients.map(({ client, paymentStatus }) => {
+                const filial = mockFiliais.find(f => f.id === client.filialId);
+                return (
+                  <div 
+                    key={client.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-background border hover:border-destructive transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{client.name}</p>
+                        <Badge 
+                          variant={paymentStatus.status === 'suspenso' ? 'destructive' : 'secondary'}
+                          className="text-xs"
+                        >
+                          {paymentStatus.status === 'suspenso' ? 'Suspenso' : `${paymentStatus.overdueCount} meses`}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                        <span>{filial?.name}</span>
+                        <span className="text-destructive font-medium">
+                          Dívida: {paymentStatus.totalDebt.toLocaleString()} AOA
+                        </span>
+                      </div>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => navigate('/clientes')}
+                    >
+                      Ver Detalhes
+                    </Button>
+                  </div>
+                );
+              })}
+              
+              <Button 
+                className="w-full mt-2" 
+                variant="destructive"
+                onClick={() => navigate('/clientes')}
+              >
+                Ver Todos os Inadimplentes ({totalOverdueClients})
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Metrics Cards */}
       <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <MetricCard
@@ -224,12 +316,13 @@ export default function Dashboard() {
           trendValue="+12.5%"
         />
         <MetricCard
-          title="Taxa de Inadimplência"
-          value={`${metrics.defaultRate.toFixed(1)}%`}
-          description="últimos 30 dias"
+          title="Inadimplentes Críticos"
+          value={totalOverdueClients}
+          description="clientes com atraso"
           icon={AlertTriangle}
           trend="down"
           trendValue="-3.2%"
+          className={totalOverdueClients > 0 ? 'border-l-4 border-l-destructive' : ''}
         />
       </div>
 
