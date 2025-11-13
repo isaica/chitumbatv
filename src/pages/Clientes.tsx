@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { mockClients, mockFiliais, mockMensalidades } from '@/data/mock';
 import { Client, Mensalidade } from '@/types';
@@ -24,6 +25,7 @@ import { NoClients, NoSearchResults } from '@/components/ui/empty-states';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { MobileTable, MobileCard, MobileActionMenu, StatusBadge } from '@/components/ui/mobile-table';
 import { useResponsive } from '@/hooks/use-responsive';
+import { exportToExcel } from '@/utils/export';
 
 const clientSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -107,11 +109,11 @@ export default function Clientes() {
     if (quickFilter === 'suspenso') {
       matchesQuickFilter = client.paymentStatus.status === 'suspenso';
     } else if (quickFilter === 'critico') {
-      matchesQuickFilter = client.paymentStatus.overdueMonthsCount >= 2 && client.paymentStatus.status !== 'suspenso';
+      matchesQuickFilter = client.paymentStatus.overdueCount >= 2 && client.paymentStatus.status !== 'suspenso';
     } else if (quickFilter === 'atrasado') {
-      matchesQuickFilter = (client.paymentStatus.status === 'inadimplente' || client.paymentStatus.overdueMonthsCount === 1) && client.paymentStatus.status !== 'suspenso';
+      matchesQuickFilter = (client.paymentStatus.status === 'inadimplente' || client.paymentStatus.overdueCount === 1) && client.paymentStatus.status !== 'suspenso';
     } else if (quickFilter === 'em_dia') {
-      matchesQuickFilter = client.paymentStatus.status === 'em_dia';
+      matchesQuickFilter = client.paymentStatus.status === 'pago';
     }
     
     // Non-admin users can only see their filial's clients
@@ -273,7 +275,16 @@ export default function Clientes() {
       });
     } else if (action === 'export') {
       const selectedData = clients.filter(c => selectedClients.includes(c.id));
-      exportToExcel(selectedData, mockFiliais, 'clientes_selecionados');
+      exportToExcel({
+        filename: 'clientes_selecionados',
+        title: 'Clientes Selecionados',
+        columns: [
+          { key: 'name', title: 'Nome' },
+          { key: 'phone', title: 'Telefone' },
+          { key: 'email', title: 'Email' },
+        ],
+        data: selectedData,
+      });
     }
     setSelectedClients([]);
   };
@@ -281,12 +292,12 @@ export default function Clientes() {
   // Calculate quick filter counts
   const suspendedCount = clientsWithPaymentStatus.filter(c => c.paymentStatus.status === 'suspenso').length;
   const criticalCount = clientsWithPaymentStatus.filter(c => {
-    return c.paymentStatus.overdueMonthsCount >= 2 && c.paymentStatus.status !== 'suspenso';
+    return c.paymentStatus.overdueCount >= 2 && c.paymentStatus.status !== 'suspenso';
   }).length;
   const overdueCount = clientsWithPaymentStatus.filter(c => {
-    return (c.paymentStatus.status === 'inadimplente' || c.paymentStatus.overdueMonthsCount === 1) && c.paymentStatus.status !== 'suspenso';
+    return (c.paymentStatus.status === 'inadimplente' || c.paymentStatus.overdueCount === 1) && c.paymentStatus.status !== 'suspenso';
   }).length;
-  const paidCount = clientsWithPaymentStatus.filter(c => c.paymentStatus.status === 'em_dia').length;
+  const paidCount = clientsWithPaymentStatus.filter(c => c.paymentStatus.status === 'pago').length;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-AO', {
