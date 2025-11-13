@@ -150,6 +150,24 @@ export default function Dashboard() {
   const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
+
+  const handlePayment = (mensalidadeIds: string[]) => {
+    setMensalidades(prev =>
+      prev.map(m =>
+        mensalidadeIds.includes(m.id)
+          ? { ...m, status: 'pago' as const, paidAt: new Date() }
+          : m
+      )
+    );
+    
+    toast({
+      title: 'Pagamento registrado',
+      description: `${mensalidadeIds.length} ${mensalidadeIds.length === 1 ? 'mensalidade paga' : 'mensalidades pagas'} com sucesso.`,
+    });
+
+    setIsPaymentModalOpen(false);
+    setSelectedClientForPayment(null);
+  };
   const metrics = mockDashboardMetrics;
 
   // Filter data based on user role and filial
