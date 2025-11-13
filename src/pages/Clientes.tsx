@@ -55,6 +55,8 @@ export default function Clientes() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [paymentClient, setPaymentClient] = useState<Client | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedClients, setSelectedClients] = useState<string[]>([]);
+  const [quickFilter, setQuickFilter] = useState<'all' | 'suspenso' | 'critico' | 'atrasado' | 'em_dia'>('all');
   const { toast } = useToast();
 
   const {
@@ -100,10 +102,22 @@ export default function Clientes() {
                         (debtFilter === 'no_debt' && client.paymentStatus.totalDebt === 0) ||
                         (debtFilter === 'with_debt' && client.paymentStatus.totalDebt > 0);
     
+    // Quick filter logic
+    let matchesQuickFilter = true;
+    if (quickFilter === 'suspenso') {
+      matchesQuickFilter = client.paymentStatus.status === 'suspenso';
+    } else if (quickFilter === 'critico') {
+      matchesQuickFilter = client.paymentStatus.overdueMonthsCount >= 2 && client.paymentStatus.status !== 'suspenso';
+    } else if (quickFilter === 'atrasado') {
+      matchesQuickFilter = (client.paymentStatus.status === 'inadimplente' || client.paymentStatus.overdueMonthsCount === 1) && client.paymentStatus.status !== 'suspenso';
+    } else if (quickFilter === 'em_dia') {
+      matchesQuickFilter = client.paymentStatus.status === 'em_dia';
+    }
+    
     // Non-admin users can only see their filial's clients
     const hasAccess = user?.role === 'admin' || client.filialId === user?.filialId;
     
-    return matchesSearch && matchesStatus && matchesFilial && matchesDebt && hasAccess;
+    return matchesSearch && matchesStatus && matchesFilial && matchesDebt && matchesQuickFilter && hasAccess;
   });
 
   const getFilialName = (filialId: string) => {
@@ -234,6 +248,45 @@ export default function Clientes() {
       description: `${mensalidadeIds.length} ${mensalidadeIds.length === 1 ? 'mensalidade foi registrada' : 'mensalidades foram registradas'} com sucesso.`,
     });
   };
+
+  const handleSelectAll = () => {
+    if (selectedClients.length === filteredClients.length) {
+      setSelectedClients([]);
+    } else {
+      setSelectedClients(filteredClients.map(c => c.id));
+    }
+  };
+
+  const handleSelectClient = (clientId: string) => {
+    setSelectedClients(prev => 
+      prev.includes(clientId)
+        ? prev.filter(id => id !== clientId)
+        : [...prev, clientId]
+    );
+  };
+
+  const handleBulkAction = (action: 'remind' | 'export') => {
+    if (action === 'remind') {
+      toast({
+        title: 'Lembretes enviados',
+        description: `Lembretes foram enviados para ${selectedClients.length} ${selectedClients.length === 1 ? 'cliente' : 'clientes'}.`,
+      });
+    } else if (action === 'export') {
+      const selectedData = clients.filter(c => selectedClients.includes(c.id));
+      exportToExcel(selectedData, mockFiliais, 'clientes_selecionados');
+    }
+    setSelectedClients([]);
+  };
+
+  // Calculate quick filter counts
+  const suspendedCount = clientsWithPaymentStatus.filter(c => c.paymentStatus.status === 'suspenso').length;
+  const criticalCount = clientsWithPaymentStatus.filter(c => {
+    return c.paymentStatus.overdueMonthsCount >= 2 && c.paymentStatus.status !== 'suspenso';
+  }).length;
+  const overdueCount = clientsWithPaymentStatus.filter(c => {
+    return (c.paymentStatus.status === 'inadimplente' || c.paymentStatus.overdueMonthsCount === 1) && c.paymentStatus.status !== 'suspenso';
+  }).length;
+  const paidCount = clientsWithPaymentStatus.filter(c => c.paymentStatus.status === 'em_dia').length;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-AO', {
@@ -433,7 +486,47 @@ export default function Clientes() {
         <CardHeader>
           <CardTitle className="text-lg">Filtros</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* Quick Filters */}
+          <div className="flex flex-wrap gap-2">
+            <Badge 
+              variant={quickFilter === 'all' ? 'default' : 'outline'}
+              className="cursor-pointer px-4 py-2 text-sm hover:bg-primary/90 transition-colors"
+              onClick={() => setQuickFilter('all')}
+            >
+              Todos ({clientsWithPaymentStatus.length})
+            </Badge>
+            <Badge 
+              variant={quickFilter === 'suspenso' ? 'destructive' : 'outline'}
+              className="cursor-pointer px-4 py-2 text-sm hover:bg-destructive/90 transition-colors"
+              onClick={() => setQuickFilter('suspenso')}
+            >
+              🔴 Suspensos ({suspendedCount})
+            </Badge>
+            <Badge 
+              variant={quickFilter === 'critico' ? 'default' : 'outline'}
+              className="cursor-pointer px-4 py-2 text-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+              onClick={() => setQuickFilter('critico')}
+            >
+              🟠 Críticos ({criticalCount})
+            </Badge>
+            <Badge 
+              variant={quickFilter === 'atrasado' ? 'default' : 'outline'}
+              className="cursor-pointer px-4 py-2 text-sm bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500"
+              onClick={() => setQuickFilter('atrasado')}
+            >
+              🟡 Atrasados ({overdueCount})
+            </Badge>
+            <Badge 
+              variant={quickFilter === 'em_dia' ? 'default' : 'outline'}
+              className="cursor-pointer px-4 py-2 text-sm bg-success hover:bg-success/90 text-white border-success"
+              onClick={() => setQuickFilter('em_dia')}
+            >
+              🟢 Em Dia ({paidCount})
+            </Badge>
+          </div>
+
+          {/* Search and Filters */}
           <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
@@ -483,6 +576,33 @@ export default function Clientes() {
               </Select>
             )}
           </div>
+
+          {/* Bulk Actions */}
+          {selectedClients.length > 0 && (
+            <div className="flex flex-wrap gap-2 items-center p-3 bg-muted/50 rounded-lg">
+              <Checkbox
+                checked={selectedClients.length === filteredClients.length && filteredClients.length > 0}
+                onCheckedChange={handleSelectAll}
+              />
+              <span className="text-sm font-medium flex-1">
+                {selectedClients.length} {selectedClients.length === 1 ? 'cliente selecionado' : 'clientes selecionados'}
+              </span>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => handleBulkAction('remind')}
+              >
+                Enviar Lembretes
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkAction('export')}
+              >
+                Exportar Seleção
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
