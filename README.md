@@ -64,13 +64,6 @@ This project is built with:
 - Lovable
 - Trae
 
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/cc0deb30-f43d-4226-b0de-c849f1d2eb83) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
 Yes, you can!
 
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
