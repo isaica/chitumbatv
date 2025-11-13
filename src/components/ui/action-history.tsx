@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   History, 
@@ -16,8 +16,11 @@ import {
   Filter,
   Search,
   Calendar,
-  Clock
+  Clock,
+  Activity,
+  TrendingUp
 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -109,6 +112,8 @@ export function ActionHistory({
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [actionFilter, setActionFilter] = useState<string>('all');
   const [timeFilter, setTimeFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'list' | 'timeline'>('list');
+  const { toast } = useToast();
 
   // Filter actions
   const filteredActions = actions.filter(action => {

@@ -38,23 +38,47 @@ export function GlobalSearch() {
     ? mockUsers.filter(u => u.filialId === user.filialId || u.role === 'admin')
     : [user].filter(Boolean);
 
+  const calculateClientPaymentStatus = (clientId: string) => {
+    const clientMensalidades = mockMensalidades.filter(m => m.clientId === clientId);
+    const overdue = clientMensalidades.filter(m => m.status === 'atrasado').length;
+    const client = mockClients.find(c => c.id === clientId);
+    
+    if (client?.status === 'suspenso') return '🔴 Suspenso';
+    if (overdue >= 3) return '🔴 Crítico';
+    if (overdue >= 1) return '⚠️ Atrasado';
+    return '✅ Em dia';
+  };
+
   const search = (searchQuery: string): SearchResult[] => {
     if (!searchQuery.trim()) return [];
 
     const query = searchQuery.toLowerCase();
     const results: SearchResult[] = [];
 
-    // Search clients
+    // Check for special search commands
+    const isStatusSearch = query.startsWith('status:');
+    const isPaymentSearch = query.startsWith('atraso') || query.startsWith('suspenso') || query.startsWith('critico');
+
+    // Search clients with enhanced payment status
     availableClients.forEach(client => {
-      if (
+      const paymentStatus = calculateClientPaymentStatus(client.id);
+      const matchesText = 
         client.name.toLowerCase().includes(query) ||
         client.email.toLowerCase().includes(query) ||
-        client.phone.includes(query)
-      ) {
+        client.phone.includes(query) ||
+        client.document.includes(query);
+
+      const matchesStatus = isPaymentSearch && (
+        (query.includes('suspenso') && client.status === 'suspenso') ||
+        (query.includes('critico') && paymentStatus.includes('Crítico')) ||
+        (query.includes('atraso') && paymentStatus.includes('Atrasado'))
+      );
+
+      if (matchesText || matchesStatus || (isStatusSearch && client.status.includes(query.replace('status:', '').trim()))) {
         const filial = mockFiliais.find(f => f.id === client.filialId);
         results.push({
           id: client.id,
-          title: client.name,
+          title: `${client.name} ${paymentStatus}`,
           subtitle: `${client.email} • ${filial?.name || 'N/A'}`,
           type: 'client',
           href: '/clientes',
@@ -83,18 +107,31 @@ export function GlobalSearch() {
       });
     }
 
-    // Search mensalidades
+    // Search mensalidades with enhanced filtering
     const relevantMensalidades = mockMensalidades.filter(m => 
       availableClients.some(c => c.id === m.clientId)
     );
     
     relevantMensalidades.forEach(mensalidade => {
       const client = availableClients.find(c => c.id === mensalidade.clientId);
-      if (client && client.name.toLowerCase().includes(query)) {
+      const monthYear = new Date(mensalidade.year, mensalidade.month - 1).toLocaleDateString('pt-AO', { month: 'long', year: 'numeric' });
+      const amount = new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA' }).format(mensalidade.amount);
+      
+      const matchesText = client && (
+        client.name.toLowerCase().includes(query) ||
+        monthYear.toLowerCase().includes(query)
+      );
+      
+      const matchesStatus = 
+        (query.includes('pago') && mensalidade.status === 'pago') ||
+        (query.includes('pendente') && mensalidade.status === 'pendente') ||
+        (query.includes('atrasado') && mensalidade.status === 'atrasado');
+      
+      if ((matchesText || matchesStatus) && client) {
         results.push({
           id: mensalidade.id,
-          title: `Mensalidade - ${client.name}`,
-          subtitle: `${new Date(mensalidade.year, mensalidade.month - 1).toLocaleDateString('pt-AO', { month: 'long', year: 'numeric' })} • ${mensalidade.status}`,
+          title: `${client.name} - ${amount}`,
+          subtitle: `${monthYear} • ${mensalidade.status.toUpperCase()}`,
           type: 'mensalidade',
           href: '/mensalidades',
           icon: <CreditCard className="w-4 h-4" />
