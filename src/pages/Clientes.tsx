@@ -739,7 +739,13 @@ export default function Clientes() {
                       </TableHeader>
                       <TableBody>
                         {paginatedClients.map((client) => (
-                          <TableRow key={client.id} className="hover:bg-muted/50">
+                          <TableRow 
+                            key={client.id} 
+                            className={`hover:bg-muted/50 transition-colors ${
+                              client.paymentStatus.status === 'suspenso' ? 'critical-row' :
+                              client.paymentStatus.overdueCount >= 2 ? 'warning-row' : ''
+                            }`}
+                          >
                             <TableCell>
                               <div className="flex items-center space-x-3">
                                 <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/70 rounded-full flex items-center justify-center text-primary-foreground font-semibold text-sm">
