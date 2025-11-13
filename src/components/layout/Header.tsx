@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { GlobalSearch } from './GlobalSearch';
+import { NotificationDropdown } from './NotificationDropdown';
 
 
 export function Header() {
@@ -47,12 +48,7 @@ export function Header() {
             </Button>
           </div>
           
-          <Button variant="ghost" size="sm" className="relative">
-            <Bell className="w-4 h-4" />
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full text-xs flex items-center justify-center text-destructive-foreground">
-              3
-            </span>
-          </Button>
+          <NotificationDropdown />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

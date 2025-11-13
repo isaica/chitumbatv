@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart
@@ -14,6 +15,9 @@ import ActionHistory, { ActionRecord } from '@/components/ui/action-history';
 import { exportToPDF } from '@/utils/export';
 import { calculateClientPaymentStatus } from '@/utils/paymentStatus';
 import { useNavigate } from 'react-router-dom';
+import { QuickPaymentModal } from '@/components/ui/quick-payment-modal';
+import { Client, Mensalidade } from '@/types';
+import { useToast } from '@/hooks/use-toast';
 
 // Mock data for enhanced charts
 const paymentData = [
@@ -140,6 +144,10 @@ function MetricCard({ title, value, description, icon: Icon, trend, trendValue, 
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [mensalidades, setMensalidades] = useState<Mensalidade[]>(mockMensalidades);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
   const metrics = mockDashboardMetrics;
@@ -597,6 +605,20 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Quick Payment Modal */}
+      {selectedClientForPayment && (
+        <QuickPaymentModal
+          open={isPaymentModalOpen}
+          onClose={() => {
+            setIsPaymentModalOpen(false);
+            setSelectedClientForPayment(null);
+          }}
+          client={selectedClientForPayment}
+          mensalidades={mensalidades}
+          onPayment={handlePayment}
+        />
       )}
     </div>
   );

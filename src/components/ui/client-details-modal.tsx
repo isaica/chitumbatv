@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { User, MapPin, Phone, Mail, Calendar, CreditCard, AlertCircle } from 'lucide-react';
+import { User, MapPin, Phone, Mail, Calendar, CreditCard, AlertCircle, TrendingUp, CheckCircle2, XCircle } from 'lucide-react';
 import { Client, Mensalidade } from '@/types';
 import { ClientPaymentStatus, getStatusLabel, getStatusColor } from '@/utils/paymentStatus';
 import { mockFiliais } from '@/data/mock';
@@ -48,6 +48,53 @@ export function ClientDetailsModal({
     return months[month - 1];
   };
 
+  // Get last 6 months payment history
+  const getLast6MonthsHistory = () => {
+    const history = [];
+    const currentDate = new Date();
+    
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      
+      const mensalidade = clientMensalidades.find(m => m.year === year && m.month === month);
+      
+      history.push({
+        month: getMonthName(month).substring(0, 3),
+        year,
+        fullMonth: month,
+        status: mensalidade?.status || 'pendente',
+        paid: mensalidade?.status === 'pago'
+      });
+    }
+    
+    return history;
+  };
+
+  const paymentHistory = getLast6MonthsHistory();
+
+  // Determine recommended actions
+  const getRecommendedActions = () => {
+    if (paymentStatus.status === 'suspenso') {
+      return [
+        { label: 'Negociar Dívida', variant: 'default' as const },
+        { label: 'Reativar Cliente', variant: 'secondary' as const }
+      ];
+    }
+    if (paymentStatus.status === 'inadimplente' || paymentStatus.totalDebt > 0) {
+      return [
+        { label: 'Enviar Lembrete', variant: 'default' as const },
+        { label: 'Registrar Pagamento', variant: 'secondary' as const }
+      ];
+    }
+    return [
+      { label: 'Ver Histórico Completo', variant: 'secondary' as const }
+    ];
+  };
+
+  const recommendedActions = getRecommendedActions();
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -62,6 +109,39 @@ export function ClientDetailsModal({
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Payment Timeline Chart */}
+          <Card className="border-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-primary" />
+                Histórico de Pagamentos (Últimos 6 Meses)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-end justify-between gap-2 h-32">
+                {paymentHistory.map((item, index) => (
+                  <div key={index} className="flex-1 flex flex-col items-center gap-2">
+                    <div className="w-full flex items-end justify-center h-24">
+                      {item.paid ? (
+                        <div className="w-full bg-success/20 border-2 border-success rounded-t-lg flex items-center justify-center h-full animate-in fade-in slide-in-from-bottom-4">
+                          <CheckCircle2 className="w-5 h-5 text-success" />
+                        </div>
+                      ) : (
+                        <div className="w-full bg-destructive/20 border-2 border-destructive rounded-t-lg flex items-center justify-center h-16">
+                          <XCircle className="w-4 h-4 text-destructive" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-medium">{item.month}</p>
+                      <p className="text-[10px] text-muted-foreground">{item.year}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Status de Pagamento */}
           <Card className="border-2">
             <CardHeader className="pb-3">
@@ -107,6 +187,27 @@ export function ClientDetailsModal({
                   <span className="text-green-700 font-medium">Todas as mensalidades em dia!</span>
                 </div>
               )}
+
+              {/* Recommended Actions */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Ações Recomendadas</p>
+                <div className="flex flex-wrap gap-2">
+                  {recommendedActions.map((action, index) => (
+                    <Button 
+                      key={index}
+                      variant={action.variant}
+                      size="sm"
+                      onClick={() => {
+                        if (action.label === 'Registrar Pagamento' && onRegisterPayment) {
+                          onRegisterPayment(client.id);
+                        }
+                      }}
+                    >
+                      {action.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
 

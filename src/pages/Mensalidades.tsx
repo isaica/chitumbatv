@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, CheckCircle, Clock, AlertTriangle, Calendar } from 'lucide-react';
+import { Search, CheckCircle, Clock, AlertTriangle, Calendar, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,11 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { mockMensalidades, mockClients, mockFiliais } from '@/data/mock';
-import { Mensalidade } from '@/types';
+import { Mensalidade, Client } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
 import { NoMensalidades, NoSearchResults } from '@/components/ui/empty-states';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
+import { QuickPaymentModal } from '@/components/ui/quick-payment-modal';
 
 export default function Mensalidades() {
   const { user } = useAuth();
@@ -21,6 +22,8 @@ export default function Mensalidades() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pago' | 'pendente' | 'atrasado'>('all');
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [filialFilter, setFilialFilter] = useState<string>('all');
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
   const { toast } = useToast();
 
   // Filter mensalidades based on user role
@@ -70,6 +73,27 @@ export default function Mensalidades() {
       title: 'Mensalidade marcada como paga',
       description: 'O pagamento foi registrado com sucesso.',
     });
+  };
+
+  const handlePayment = (mensalidadeIds: string[]) => {
+    setMensalidades(prev => prev.map(m => 
+      mensalidadeIds.includes(m.id) 
+        ? { ...m, status: 'pago' as const, paidAt: new Date() }
+        : m
+    ));
+    
+    toast({
+      title: 'Pagamento registrado!',
+      description: `${mensalidadeIds.length} ${mensalidadeIds.length === 1 ? 'mensalidade foi registrada' : 'mensalidades foram registradas'} com sucesso.`,
+    });
+  };
+
+  const handleOpenPaymentModal = (clientId: string) => {
+    const client = mockClients.find(c => c.id === clientId);
+    if (client) {
+      setSelectedClientForPayment(client);
+      setIsPaymentModalOpen(true);
+    }
   };
 
   const getStatusIcon = (status: string) => {
