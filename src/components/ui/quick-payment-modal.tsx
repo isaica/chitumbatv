@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, CheckCircle, Calendar, AlertCircle } from 'lucide-react';
+import { X, CheckCircle, Calendar, AlertCircle, TrendingUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -165,6 +165,39 @@ export function QuickPaymentModal({
     }
   };
 
+  // Separate months by type
+  const overdueMensalidades = unPaidMensalidades.filter(m => m.status === 'atrasado');
+  const currentMensalidades = unPaidMensalidades.filter(m => 
+    !m.status || (m.status === 'pendente' && m.month === currentMonth && m.year === currentYear)
+  );
+  const futureMensalidades = unPaidMensalidades.filter(m => (m as any).isFuture);
+
+  const handleSelectOverdue = () => {
+    setSelectedMensalidades(overdueMensalidades.map(m => m.id));
+  };
+
+  const handleSelectCurrent = () => {
+    setSelectedMensalidades(currentMensalidades.map(m => m.id));
+  };
+
+  const handleSelectFuture3 = () => {
+    const next3 = futureMensalidades.slice(0, 3);
+    setSelectedMensalidades([
+      ...overdueMensalidades.map(m => m.id),
+      ...currentMensalidades.map(m => m.id),
+      ...next3.map(m => m.id)
+    ]);
+  };
+
+  const handleSelectFuture6 = () => {
+    const next6 = futureMensalidades.slice(0, 6);
+    setSelectedMensalidades([
+      ...overdueMensalidades.map(m => m.id),
+      ...currentMensalidades.map(m => m.id),
+      ...next6.map(m => m.id)
+    ]);
+  };
+
   const handleConfirmPayment = () => {
     if (selectedMensalidades.length > 0) {
       onPayment(selectedMensalidades);
@@ -182,13 +215,6 @@ export function QuickPaymentModal({
     if (m.status === 'atrasado') return 'Atrasado';
     return 'Pendente';
   };
-
-  // Separate months by type
-  const overdueMensalidades = unPaidMensalidades.filter(m => m.status === 'atrasado');
-  const currentMensalidades = unPaidMensalidades.filter(m => 
-    !m.status || (m.status === 'pendente' && m.month === currentMonth && m.year === currentYear)
-  );
-  const futureMensalidades = unPaidMensalidades.filter(m => (m as any).isFuture);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -225,19 +251,72 @@ export function QuickPaymentModal({
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium">
-                  Mensalidades Disponíveis ({unPaidMensalidades.length})
-                </p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleSelectAll}
-                >
-                  {selectedMensalidades.length === unPaidMensalidades.length 
-                    ? 'Desmarcar Todos' 
-                    : 'Selecionar Todos'}
-                </Button>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">
+                    Mensalidades Disponíveis ({unPaidMensalidades.length})
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleSelectAll}
+                  >
+                    {selectedMensalidades.length === unPaidMensalidades.length 
+                      ? 'Desmarcar Todos' 
+                      : 'Selecionar Todos'}
+                  </Button>
+                </div>
+
+                {/* Quick Selection Buttons */}
+                <div className="p-3 bg-muted/20 rounded-lg border border-border/50">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Seleção Rápida</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {overdueMensalidades.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectOverdue}
+                        className="text-xs border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        Pagar Atrasados ({overdueMensalidades.length})
+                      </Button>
+                    )}
+                    {currentMensalidades.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectCurrent}
+                        className="text-xs border-primary/30 hover:bg-primary/10 hover:text-primary"
+                      >
+                        <Calendar className="w-3 h-3 mr-1" />
+                        Pagar Mês Atual
+                      </Button>
+                    )}
+                    {futureMensalidades.length >= 3 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectFuture3}
+                        className="text-xs border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-600"
+                      >
+                        <TrendingUp className="w-3 h-3 mr-1" />
+                        Adiantar 3 Meses
+                      </Button>
+                    )}
+                    {futureMensalidades.length >= 6 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectFuture6}
+                        className="text-xs border-green-500/30 hover:bg-green-500/10 hover:text-green-600"
+                      >
+                        <TrendingUp className="w-3 h-3 mr-1" />
+                        Adiantar 6 Meses
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-4 max-h-[400px] overflow-y-auto">
