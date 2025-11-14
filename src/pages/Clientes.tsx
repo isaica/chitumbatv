@@ -238,17 +238,50 @@ export default function Clientes() {
   };
 
   const handleConfirmPayment = (mensalidadeIds: string[]) => {
-    // Update mensalidades to mark as paid
-    setMensalidades(prev => prev.map(m => 
-      mensalidadeIds.includes(m.id)
-        ? { ...m, status: 'pago' as const, paidAt: new Date() }
-        : m
-    ));
-
+    // Separate existing IDs from virtual/future ones
+    const existingIds = mensalidadeIds.filter(id => !id.startsWith('virtual-'));
+    const virtualIds = mensalidadeIds.filter(id => id.startsWith('virtual-'));
+    
+    // Create new mensalidades for virtual/future months
+    const newMensalidades: Mensalidade[] = virtualIds.map(id => {
+      // Extract info from ID: virtual-{clientId}-{year}-{month}
+      const parts = id.split('-');
+      const clientId = parts.slice(1, -2).join('-');
+      const year = parseInt(parts[parts.length - 2]);
+      const month = parseInt(parts[parts.length - 1]);
+      
+      const client = clients.find(c => c.id === clientId);
+      const filial = client ? mockFiliais.find(f => f.id === client.filialId) : null;
+      
+      return {
+        id: `${clientId}-${year}-${month}-${Date.now()}`,
+        clientId,
+        month,
+        year,
+        amount: filial?.monthlyPrice || 0,
+        status: 'pago' as const,
+        dueDate: new Date(year, month - 1, 15),
+        paidAt: new Date(),
+        createdAt: new Date()
+      };
+    });
+    
+    // Update state
+    setMensalidades(prev => [
+      ...prev.map(m => 
+        existingIds.includes(m.id) 
+          ? { ...m, status: 'pago' as const, paidAt: new Date() }
+          : m
+      ),
+      ...newMensalidades
+    ]);
+    
     toast({
-      title: 'Pagamento registrado',
+      title: 'Pagamento registrado!',
       description: `${mensalidadeIds.length} ${mensalidadeIds.length === 1 ? 'mensalidade foi registrada' : 'mensalidades foram registradas'} com sucesso.`,
     });
+    
+    setIsPaymentModalOpen(false);
   };
 
   const handleSelectAll = () => {
@@ -652,10 +685,10 @@ export default function Clientes() {
                                 label: 'Ver Detalhes',
                                 onClick: () => handleViewDetails(client),
                               },
-                              ...(client.paymentStatus.totalDebt > 0 ? [{
+                              {
                                 label: 'Registrar Pagamento',
                                 onClick: () => handleRegisterPayment(client.id),
-                              }] : []),
+                              },
                               {
                                 label: 'Editar',
                                 onClick: () => handleOpenDialog(client),
@@ -814,12 +847,10 @@ export default function Clientes() {
                                     <Eye className="w-4 h-4 mr-2" />
                                     Ver Detalhes
                                   </DropdownMenuItem>
-                                  {client.paymentStatus.totalDebt > 0 && (
-                                    <DropdownMenuItem onClick={() => handleRegisterPayment(client.id)}>
-                                      <CreditCard className="w-4 h-4 mr-2" />
-                                      Registrar Pagamento
-                                    </DropdownMenuItem>
-                                  )}
+                                  <DropdownMenuItem onClick={() => handleRegisterPayment(client.id)}>
+                                    <CreditCard className="w-4 h-4 mr-2" />
+                                    Registrar Pagamento
+                                  </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => handleOpenDialog(client)}>
                                     <Edit className="w-4 h-4 mr-2" />
                                     Editar
