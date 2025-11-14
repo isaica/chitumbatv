@@ -152,13 +152,43 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   const handlePayment = (mensalidadeIds: string[]) => {
-    setMensalidades(prev =>
-      prev.map(m =>
-        mensalidadeIds.includes(m.id)
+    // Separate existing IDs from virtual/future ones
+    const existingIds = mensalidadeIds.filter(id => !id.startsWith('virtual-'));
+    const virtualIds = mensalidadeIds.filter(id => id.startsWith('virtual-'));
+    
+    // Create new mensalidades for virtual/future months
+    const newMensalidades: Mensalidade[] = virtualIds.map(id => {
+      // Extract info from ID: virtual-{clientId}-{year}-{month}
+      const parts = id.split('-');
+      const clientId = parts.slice(1, -2).join('-');
+      const year = parseInt(parts[parts.length - 2]);
+      const month = parseInt(parts[parts.length - 1]);
+      
+      const client = mockClients.find(c => c.id === clientId);
+      const filial = client ? mockFiliais.find(f => f.id === client.filialId) : null;
+      
+      return {
+        id: `${clientId}-${year}-${month}-${Date.now()}`,
+        clientId,
+        month,
+        year,
+        amount: filial?.monthlyPrice || 0,
+        status: 'pago' as const,
+        dueDate: new Date(year, month - 1, 15),
+        paidAt: new Date(),
+        createdAt: new Date()
+      };
+    });
+    
+    // Update state
+    setMensalidades(prev => [
+      ...prev.map(m =>
+        existingIds.includes(m.id)
           ? { ...m, status: 'pago' as const, paidAt: new Date() }
           : m
-      )
-    );
+      ),
+      ...newMensalidades
+    ]);
     
     toast({
       title: 'Pagamento registrado',
