@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, CheckCircle, Calendar, AlertCircle, TrendingUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -31,7 +32,7 @@ function MensalidadeItem({
 
   return (
     <div 
-      className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors cursor-pointer"
+      className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-all duration-200 cursor-pointer animate-fade-in hover:scale-[1.02]"
       onClick={() => onToggle(m.id)}
     >
       <div className="flex items-center gap-3">
@@ -81,6 +82,7 @@ export function QuickPaymentModal({
   onPayment 
 }: QuickPaymentModalProps) {
   const [selectedMensalidades, setSelectedMensalidades] = useState<string[]>([]);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   // Generate available months: last 3 + current + next 6 months
   const generateAvailableMonths = () => {
@@ -216,8 +218,44 @@ export function QuickPaymentModal({
     return 'Pendente';
   };
 
+  // Smart Pay: Auto-select overdue + current month when modal opens
+  useEffect(() => {
+    if (open && selectedMensalidades.length === 0) {
+      const smartSelection = [
+        ...overdueMensalidades.map(m => m.id),
+        ...currentMensalidades.map(m => m.id)
+      ];
+      if (smartSelection.length > 0) {
+        setSelectedMensalidades(smartSelection);
+      }
+    }
+  }, [open]);
+
+  // Reset selection when modal closes
+  useEffect(() => {
+    if (!open) {
+      setSelectedMensalidades([]);
+      setShowCancelConfirm(false);
+    }
+  }, [open]);
+
+  const handleCloseAttempt = () => {
+    if (selectedMensalidades.length > 0) {
+      setShowCancelConfirm(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleCancelConfirmed = () => {
+    setShowCancelConfirm(false);
+    setSelectedMensalidades([]);
+    onClose();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <>
+      <Dialog open={open} onOpenChange={handleCloseAttempt}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -381,43 +419,65 @@ export function QuickPaymentModal({
                 )}
               </div>
 
-              {/* Total */}
-              <div className="p-4 bg-primary/10 rounded-lg border-2 border-primary">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total a Pagar</p>
-                    <p className="text-xs text-muted-foreground">
-                      {selectedMensalidades.length} {selectedMensalidades.length === 1 ? 'mês selecionado' : 'meses selecionados'}
+              {/* Floating Summary - Sticky */}
+              <div className="sticky bottom-0 -mx-6 -mb-6 bg-background border-t shadow-lg animate-fade-in">
+                <div className="p-4 bg-primary/10 border-t-2 border-primary">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total a Pagar</p>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedMensalidades.length} {selectedMensalidades.length === 1 ? 'mês selecionado' : 'meses selecionados'}
+                      </p>
+                    </div>
+                    <p className="text-2xl font-bold text-primary transition-all duration-300">
+                      {totalAmount.toLocaleString()} AOA
                     </p>
                   </div>
-                  <p className="text-2xl font-bold text-primary">
-                    {totalAmount.toLocaleString()} AOA
-                  </p>
-                </div>
-              </div>
 
-              {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={onClose}
-                  className="flex-1"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleConfirmPayment}
-                  disabled={selectedMensalidades.length === 0}
-                  className="flex-1 gradient-primary"
-                >
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Confirmar Pagamento
-                </Button>
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={handleCloseAttempt}
+                      className="flex-1"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={handleConfirmPayment}
+                      disabled={selectedMensalidades.length === 0}
+                      className="flex-1 gradient-primary transition-all duration-200 hover:scale-105"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Confirmar Pagamento
+                    </Button>
+                  </div>
+                </div>
               </div>
             </>
           )}
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Confirmation Dialog */}
+    <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Descartar seleção?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Você tem {selectedMensalidades.length} {selectedMensalidades.length === 1 ? 'mês selecionado' : 'meses selecionados'}. 
+            Tem certeza que deseja cancelar e perder esta seleção?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Continuar Editando</AlertDialogCancel>
+          <AlertDialogAction onClick={handleCancelConfirmed} className="bg-destructive hover:bg-destructive/90">
+            Sim, Descartar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
