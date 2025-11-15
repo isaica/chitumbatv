@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Search, Edit, Trash2, MoreHorizontal, UserCog, Shield, Eye, EyeOff } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, MoreHorizontal, UserCog, Shield, Eye, EyeOff, UserCheck, UserX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +17,9 @@ import { useToast } from '@/hooks/use-toast';
 import { mockUsers, mockFiliais } from '@/data/mock';
 import { User } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
+import { NoUsers, NoSearchResults } from '@/components/ui/empty-states';
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 
 const userSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -205,10 +208,11 @@ export default function Usuarios() {
   const canManageUsers = currentUser?.role === 'admin' || currentUser?.role === 'gerente';
 
   if (!canManageUsers) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gradient">Meu Perfil</h1>
+  return (
+    <div className="space-y-6">
+      <Breadcrumbs />
+      <div>
+        <h1 className="text-3xl font-bold text-gradient">Meu Perfil</h1>
           <p className="text-muted-foreground">
             Visualize suas informações de usuário
           </p>
@@ -254,8 +258,15 @@ export default function Usuarios() {
     );
   }
 
+  const clearSearch = () => {
+    setSearchTerm('');
+    setRoleFilter('all');
+  };
+
   return (
     <div className="space-y-6">
+      <Breadcrumbs />
+      
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gradient">Gestão de Usuários</h1>
@@ -425,96 +436,121 @@ export default function Usuarios() {
       </Card>
 
       {/* Results */}
-      <Card className="border-0 shadow-primary">
-        <CardHeader>
-          <CardTitle>
-            Usuários ({filteredUsers.length})
-          </CardTitle>
-          <CardDescription>
-            Lista de usuários do sistema
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Usuário</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Função</TableHead>
-                <TableHead>Filial</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-8 h-8">
-                        <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                          {getInitials(user.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">{user.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Criado em {user.createdAt.toLocaleDateString('pt-AO')}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getRoleIcon(user.role)}
-                      <Badge variant={getRoleColor(user.role)}>
-                        {user.role}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>{getFilialName(user.filialId)}</TableCell>
-                  <TableCell>
-                    <Badge variant={user.isActive ? 'default' : 'secondary'}>
-                      {user.isActive ? 'Ativo' : 'Inativo'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {currentUser?.role === 'admin' && (
-                          <>
-                            <DropdownMenuItem onClick={() => handleOpenDialog(user)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => toggleUserStatus(user.id)}>
-                              {user.isActive ? 'Desativar' : 'Ativar'} Usuário
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="text-destructive"
-                              onClick={() => handleDelete(user)}
-                              disabled={user.id === currentUser?.id}
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Excluir
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {filteredUsers.length === 0 ? (
+        searchTerm || roleFilter !== 'all' ? (
+          <NoSearchResults searchTerm={searchTerm} onClear={clearSearch} />
+        ) : (
+          <NoUsers onCreate={currentUser?.role === 'admin' ? () => handleOpenDialog() : undefined} />
+        )
+      ) : (
+        <PaginationWrapper data={filteredUsers} itemsPerPage={10}>
+          {(paginatedUsers, paginationInfo, paginationElement) => (
+            <div className="space-y-4">
+              <Card className="border-0 shadow-primary">
+                <CardHeader>
+                  <CardTitle>
+                    Usuários ({paginationInfo.totalItems})
+                  </CardTitle>
+                  <CardDescription>
+                    Lista de usuários do sistema
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Usuário</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Função</TableHead>
+                        <TableHead>Filial</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedUsers.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="w-8 h-8">
+                                <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                                  {getInitials(user.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium">{user.name}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  Criado em {user.createdAt.toLocaleDateString('pt-AO')}
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {getRoleIcon(user.role)}
+                              <Badge variant={getRoleColor(user.role)}>
+                                {user.role}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell>{getFilialName(user.filialId)}</TableCell>
+                          <TableCell>
+                            <Badge variant={user.isActive ? 'default' : 'secondary'}>
+                              {user.isActive ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {currentUser?.role === 'admin' && (
+                                  <>
+                                    <DropdownMenuItem onClick={() => handleOpenDialog(user)}>
+                                      <Edit className="w-4 h-4 mr-2" />
+                                      Editar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => toggleUserStatus(user.id)}>
+                                      {user.isActive ? (
+                                        <>
+                                          <UserX className="w-4 h-4 mr-2" />
+                                          Desativar
+                                        </>
+                                      ) : (
+                                        <>
+                                          <UserCheck className="w-4 h-4 mr-2" />
+                                          Ativar
+                                        </>
+                                      )}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      className="text-destructive"
+                                      onClick={() => handleDelete(user)}
+                                      disabled={user.id === currentUser?.id}
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Excluir
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+              {paginationElement}
+            </div>
+          )}
+        </PaginationWrapper>
+      )}
     </div>
   );
 }

@@ -15,6 +15,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { mockFiliais, mockClients } from '@/data/mock';
 import { Filial } from '@/types';
+import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
+import { NoFiliais, NoSearchResults } from '@/components/ui/empty-states';
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 
 const filialSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -22,6 +25,7 @@ const filialSchema = z.object({
   phone: z.string().min(1, 'Telefone é obrigatório'),
   email: z.string().email('Email inválido'),
   responsavel: z.string().min(1, 'Responsável é obrigatório'),
+  monthlyPrice: z.number().min(0, 'Preço deve ser maior que zero'),
   status: z.enum(['ativa', 'inativa']),
 });
 
@@ -96,7 +100,13 @@ export default function Filiais() {
       // Create new filial
       const newFilial: Filial = {
         id: Date.now().toString(),
-        ...data,
+        name: data.name,
+        address: data.address,
+        phone: data.phone,
+        email: data.email,
+        responsavel: data.responsavel,
+        monthlyPrice: data.monthlyPrice,
+        status: data.status,
         createdAt: new Date(),
       };
       setFiliais(prev => [...prev, newFilial]);
@@ -126,8 +136,15 @@ export default function Filiais() {
     });
   };
 
+  const clearSearch = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+  };
+
   return (
     <div className="space-y-6">
+      <Breadcrumbs />
+      
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gradient">Gestão de Filiais</h1>
@@ -226,17 +243,32 @@ export default function Filiais() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select onValueChange={(value: 'ativa' | 'inativa') => setValue('status', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ativa">Ativa</SelectItem>
-                    <SelectItem value="inativa">Inativa</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="monthlyPrice">Preço Mensal (AOA)</Label>
+                  <Input
+                    id="monthlyPrice"
+                    type="number"
+                    placeholder="2500"
+                    {...register('monthlyPrice', { valueAsNumber: true })}
+                    className={errors.monthlyPrice ? 'border-destructive' : ''}
+                  />
+                  {errors.monthlyPrice && (
+                    <p className="text-sm text-destructive">{errors.monthlyPrice.message}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select onValueChange={(value: 'ativa' | 'inativa') => setValue('status', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ativa">Ativa</SelectItem>
+                      <SelectItem value="inativa">Inativa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
@@ -283,81 +315,96 @@ export default function Filiais() {
       </Card>
 
       {/* Results */}
-      <Card className="border-0 shadow-primary">
-        <CardHeader>
-          <CardTitle>
-            Filiais ({filteredFiliais.length})
-          </CardTitle>
-          <CardDescription>
-            Lista de todas as filiais da Chitumba TV
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Responsável</TableHead>
-                <TableHead>Contato</TableHead>
-                <TableHead>Clientes</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredFiliais.map((filial) => (
-                <TableRow key={filial.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{filial.name}</div>
-                      <div className="text-sm text-muted-foreground">{filial.address}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{filial.responsavel}</TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div>{filial.phone}</div>
-                      <div className="text-muted-foreground">{filial.email}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {getClientCount(filial.id)} clientes
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={filial.status === 'ativa' ? 'default' : 'secondary'}>
-                      {filial.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenDialog(filial)}>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="text-destructive"
-                          onClick={() => handleDelete(filial)}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {filteredFiliais.length === 0 ? (
+        searchTerm || statusFilter !== 'all' ? (
+          <NoSearchResults searchTerm={searchTerm} onClear={clearSearch} />
+        ) : (
+          <NoFiliais onCreate={() => handleOpenDialog()} />
+        )
+      ) : (
+        <PaginationWrapper data={filteredFiliais} itemsPerPage={10}>
+          {(paginatedFiliais, paginationInfo, paginationElement) => (
+            <div className="space-y-4">
+              <Card className="border-0 shadow-primary">
+                <CardHeader>
+                  <CardTitle>
+                    Filiais ({paginationInfo.totalItems})
+                  </CardTitle>
+                <CardDescription>
+                  Lista de todas as filiais da Chitumba TV
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Responsável</TableHead>
+                      <TableHead>Contato</TableHead>
+                      <TableHead>Clientes</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedFiliais.map((filial) => (
+                      <TableRow key={filial.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{filial.name}</div>
+                            <div className="text-sm text-muted-foreground">{filial.address}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{filial.responsavel}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>{filial.phone}</div>
+                            <div className="text-muted-foreground">{filial.email}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {getClientCount(filial.id)} clientes
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={filial.status === 'ativa' ? 'default' : 'secondary'}>
+                            {filial.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleOpenDialog(filial)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-destructive"
+                                onClick={() => handleDelete(filial)}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+            {paginationElement}
+            </div>
+          )}
+        </PaginationWrapper>
+      )}
     </div>
   );
 }

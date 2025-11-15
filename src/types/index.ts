@@ -17,14 +17,8 @@ export interface Filial {
   email: string;
   responsavel: string;
   status: 'ativa' | 'inativa';
+  monthlyPrice: number;
   createdAt: Date;
-}
-
-export interface Plan {
-  id: string;
-  name: string;
-  price: number;
-  description: string;
 }
 
 export interface Client {
@@ -39,7 +33,6 @@ export interface Client {
     province: string;
   };
   document: string;
-  planId: string;
   filialId: string;
   status: 'ativo' | 'inativo' | 'suspenso';
   createdAt: Date;

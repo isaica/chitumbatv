@@ -1,25 +1,4 @@
-import { User, Filial, Plan, Client, Mensalidade, Activity, DashboardMetrics } from '@/types';
-
-export const mockPlans: Plan[] = [
-  {
-    id: '1',
-    name: 'Básico',
-    price: 2500,
-    description: 'Plano básico com canais essenciais'
-  },
-  {
-    id: '2',
-    name: 'Premium',
-    price: 4000,
-    description: 'Plano premium com mais canais e qualidade HD'
-  },
-  {
-    id: '3',
-    name: 'VIP',
-    price: 6000,
-    description: 'Plano completo com todos os canais e qualidade 4K'
-  }
-];
+import { User, Filial, Client, Mensalidade, Activity, DashboardMetrics } from '@/types';
 
 export const mockFiliais: Filial[] = [
   {
@@ -30,6 +9,7 @@ export const mockFiliais: Filial[] = [
     email: 'centro@chitumba.ao',
     responsavel: 'João Silva',
     status: 'ativa',
+    monthlyPrice: 2500,
     createdAt: new Date('2023-01-15')
   },
   {
@@ -40,6 +20,7 @@ export const mockFiliais: Filial[] = [
     email: 'maianga@chitumba.ao',
     responsavel: 'Maria Santos',
     status: 'ativa',
+    monthlyPrice: 4000,
     createdAt: new Date('2023-02-20')
   },
   {
@@ -50,6 +31,7 @@ export const mockFiliais: Filial[] = [
     email: 'viana@chitumba.ao',
     responsavel: 'Carlos Mendes',
     status: 'ativa',
+    monthlyPrice: 3000,
     createdAt: new Date('2023-03-10')
   }
 ];
@@ -105,7 +87,6 @@ export const mockClients: Client[] = [
       province: 'Luanda'
     },
     document: '004567891LA045',
-    planId: '2',
     filialId: '1',
     status: 'ativo',
     createdAt: new Date('2023-06-15')
@@ -122,7 +103,6 @@ export const mockClients: Client[] = [
       province: 'Luanda'
     },
     document: '005678902LA046',
-    planId: '1',
     filialId: '1',
     status: 'ativo',
     createdAt: new Date('2023-07-20')
@@ -139,7 +119,6 @@ export const mockClients: Client[] = [
       province: 'Luanda'
     },
     document: '006789013LA047',
-    planId: '3',
     filialId: '2',
     status: 'ativo',
     createdAt: new Date('2023-08-10')
@@ -156,7 +135,6 @@ export const mockClients: Client[] = [
       province: 'Luanda'
     },
     document: '007890124LA048',
-    planId: '1',
     filialId: '3',
     status: 'suspenso',
     createdAt: new Date('2023-09-05')
@@ -173,7 +151,6 @@ export const mockClients: Client[] = [
       province: 'Luanda'
     },
     document: '008901235LA049',
-    planId: '2',
     filialId: '1',
     status: 'ativo',
     createdAt: new Date('2023-10-12')
@@ -190,8 +167,8 @@ const months = [
 ];
 
 mockClients.forEach(client => {
-  const plan = mockPlans.find(p => p.id === client.planId);
-  if (!plan) return;
+  const filial = mockFiliais.find(f => f.id === client.filialId);
+  if (!filial) return;
 
   months.forEach(({ month, year }, index) => {
     const adjustedMonth = month < 0 ? 12 + month : month;
@@ -205,7 +182,7 @@ mockClients.forEach(client => {
       clientId: client.id,
       month: adjustedMonth + 1,
       year: adjustedYear,
-      amount: plan.price,
+      amount: filial.monthlyPrice,
       status: isPaid ? 'pago' : (index === 2 ? 'pendente' : 'atrasado'),
       dueDate,
       paidAt: isPaid ? new Date(dueDate.getTime() + Math.random() * 10 * 24 * 60 * 60 * 1000) : undefined,
