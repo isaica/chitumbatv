@@ -160,4 +160,81 @@ All colors MUST be HSL.
   .text-gradient {
     @apply bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent;
   }
+
+  /* Urgency Animations */
+  @keyframes urgent-pulse {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1.02);
+    }
+  }
+
+  @keyframes urgent-glow {
+    0%, 100% {
+      box-shadow: 0 0 5px hsl(var(--destructive) / 0.3);
+    }
+    50% {
+      box-shadow: 0 0 20px hsl(var(--destructive) / 0.6);
+    }
+  }
+
+  @keyframes border-pulse {
+    0%, 100% {
+      border-color: hsl(var(--destructive));
+    }
+    50% {
+      border-color: hsl(var(--destructive) / 0.5);
+    }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+    20%, 40%, 60%, 80% { transform: translateX(2px); }
+  }
+
+  @keyframes critical-flash {
+    0%, 100% {
+      background-color: transparent;
+    }
+    50% {
+      background-color: hsl(var(--destructive) / 0.1);
+    }
+  }
+
+  .urgent-pulse {
+    animation: urgent-pulse 2s ease-in-out infinite;
+  }
+
+  .urgent-glow {
+    animation: urgent-glow 2s ease-in-out infinite;
+  }
+
+  .border-pulse {
+    animation: border-pulse 2s ease-in-out infinite;
+  }
+
+  .shake-once {
+    animation: shake 0.5s ease-in-out;
+  }
+
+  .critical-flash {
+    animation: critical-flash 2s ease-in-out infinite;
+  }
+
+  .urgent-badge {
+    @apply urgent-pulse bg-destructive text-destructive-foreground;
+  }
+
+  .critical-row {
+    @apply border-l-4 border-destructive critical-flash;
+  }
+
+  .warning-row {
+    @apply border-l-4 border-warning;
+  }
 }

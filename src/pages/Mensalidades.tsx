@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, CheckCircle, Clock, AlertTriangle, Calendar } from 'lucide-react';
+import { Search, CheckCircle, Clock, AlertTriangle, Calendar, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,9 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { mockMensalidades, mockClients, mockFiliais, mockPlans } from '@/data/mock';
-import { Mensalidade } from '@/types';
+import { mockMensalidades, mockClients, mockFiliais } from '@/data/mock';
+import { Mensalidade, Client } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
+import { NoMensalidades, NoSearchResults } from '@/components/ui/empty-states';
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
+import { QuickPaymentModal } from '@/components/ui/quick-payment-modal';
 
 export default function Mensalidades() {
   const { user } = useAuth();
@@ -18,6 +22,8 @@ export default function Mensalidades() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pago' | 'pendente' | 'atrasado'>('all');
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [filialFilter, setFilialFilter] = useState<string>('all');
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
   const { toast } = useToast();
 
   // Filter mensalidades based on user role
@@ -69,6 +75,61 @@ export default function Mensalidades() {
     });
   };
 
+  const handlePayment = (mensalidadeIds: string[]) => {
+    // Separate existing IDs from virtual/future ones
+    const existingIds = mensalidadeIds.filter(id => !id.startsWith('virtual-'));
+    const virtualIds = mensalidadeIds.filter(id => id.startsWith('virtual-'));
+    
+    // Create new mensalidades for virtual/future months
+    const newMensalidades: Mensalidade[] = virtualIds.map(id => {
+      // Extract info from ID: virtual-{clientId}-{year}-{month}
+      const parts = id.split('-');
+      const clientId = parts.slice(1, -2).join('-');
+      const year = parseInt(parts[parts.length - 2]);
+      const month = parseInt(parts[parts.length - 1]);
+      
+      const client = mockClients.find(c => c.id === clientId);
+      const filial = client ? mockFiliais.find(f => f.id === client.filialId) : null;
+      
+      return {
+        id: `${clientId}-${year}-${month}-${Date.now()}`,
+        clientId,
+        month,
+        year,
+        amount: filial?.monthlyPrice || 0,
+        status: 'pago' as const,
+        dueDate: new Date(year, month - 1, 15),
+        paidAt: new Date(),
+        createdAt: new Date()
+      };
+    });
+    
+    // Update state
+    setMensalidades(prev => [
+      ...prev.map(m => 
+        existingIds.includes(m.id) 
+          ? { ...m, status: 'pago' as const, paidAt: new Date() }
+          : m
+      ),
+      ...newMensalidades
+    ]);
+    
+    toast({
+      title: 'Pagamento registrado!',
+      description: `${mensalidadeIds.length} ${mensalidadeIds.length === 1 ? 'mensalidade foi registrada' : 'mensalidades foram registradas'} com sucesso.`,
+    });
+    
+    setIsPaymentModalOpen(false);
+  };
+
+  const handleOpenPaymentModal = (clientId: string) => {
+    const client = mockClients.find(c => c.id === clientId);
+    if (client) {
+      setSelectedClientForPayment(client);
+      setIsPaymentModalOpen(true);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pago':
@@ -103,8 +164,17 @@ export default function Mensalidades() {
     return options;
   };
 
+  const clearSearch = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setMonthFilter('all');
+    setFilialFilter('all');
+  };
+
   return (
     <div className="space-y-6">
+      <Breadcrumbs />
+      
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gradient">Gestão de Mensalidades</h1>
@@ -227,86 +297,101 @@ export default function Mensalidades() {
       </Card>
 
       {/* Results */}
-      <Card className="border-0 shadow-primary">
-        <CardHeader>
-          <CardTitle>
-            Mensalidades ({filteredMensalidades.length})
-          </CardTitle>
-          <CardDescription>
-            Lista de mensalidades dos clientes
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Período</TableHead>
-                <TableHead>Valor</TableHead>
-                {user?.role === 'admin' && <TableHead>Filial</TableHead>}
-                <TableHead>Vencimento</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredMensalidades.map((mensalidade) => (
-                <TableRow key={mensalidade.id}>
-                  <TableCell>
-                    <div className="font-medium">{getClientName(mensalidade.clientId)}</div>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(mensalidade.year, mensalidade.month - 1).toLocaleDateString('pt-AO', {
-                      month: 'long',
-                      year: 'numeric'
-                    })}
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-medium">{mensalidade.amount.toLocaleString()} AOA</span>
-                  </TableCell>
-                  {user?.role === 'admin' && (
-                    <TableCell>{getClientFilial(mensalidade.clientId)}</TableCell>
-                  )}
-                  <TableCell>
-                    {mensalidade.dueDate.toLocaleDateString('pt-AO')}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(mensalidade.status)}
-                      <Badge 
-                        variant={
-                          mensalidade.status === 'pago' ? 'default' :
-                          mensalidade.status === 'pendente' ? 'secondary' :
-                          'destructive'
-                        }
-                      >
-                        {mensalidade.status}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {mensalidade.status !== 'pago' && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleMarkAsPaid(mensalidade.id)}
-                        className="gradient-primary"
-                      >
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Marcar como Pago
-                      </Button>
-                    )}
-                    {mensalidade.status === 'pago' && mensalidade.paidAt && (
-                      <div className="text-sm text-muted-foreground">
-                        Pago em {mensalidade.paidAt.toLocaleDateString('pt-AO')}
-                      </div>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {filteredMensalidades.length === 0 ? (
+        searchTerm || statusFilter !== 'all' || monthFilter !== 'all' || filialFilter !== 'all' ? (
+          <NoSearchResults searchTerm={searchTerm} onClear={clearSearch} />
+        ) : (
+          <NoMensalidades />
+        )
+      ) : (
+        <PaginationWrapper data={filteredMensalidades} itemsPerPage={15}>
+          {(paginatedMensalidades, paginationInfo, paginationElement) => (
+            <div className="space-y-4">
+              <Card className="border-0 shadow-primary">
+                <CardHeader>
+                  <CardTitle>
+                    Mensalidades ({paginationInfo.totalItems})
+                  </CardTitle>
+                <CardDescription>
+                  Lista de mensalidades dos clientes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Período</TableHead>
+                      <TableHead>Valor</TableHead>
+                      {user?.role === 'admin' && <TableHead>Filial</TableHead>}
+                      <TableHead>Vencimento</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedMensalidades.map((mensalidade) => (
+                      <TableRow key={mensalidade.id}>
+                        <TableCell>
+                          <div className="font-medium">{getClientName(mensalidade.clientId)}</div>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(mensalidade.year, mensalidade.month - 1).toLocaleDateString('pt-AO', {
+                            month: 'long',
+                            year: 'numeric'
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium">{mensalidade.amount.toLocaleString()} AOA</span>
+                        </TableCell>
+                        {user?.role === 'admin' && (
+                          <TableCell>{getClientFilial(mensalidade.clientId)}</TableCell>
+                        )}
+                        <TableCell>
+                          {mensalidade.dueDate.toLocaleDateString('pt-AO')}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(mensalidade.status)}
+                            <Badge 
+                              variant={
+                                mensalidade.status === 'pago' ? 'default' :
+                                mensalidade.status === 'pendente' ? 'secondary' :
+                                'destructive'
+                              }
+                            >
+                              {mensalidade.status}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {mensalidade.status !== 'pago' && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleMarkAsPaid(mensalidade.id)}
+                              className="gradient-primary"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Marcar como Pago
+                            </Button>
+                          )}
+                          {mensalidade.status === 'pago' && mensalidade.paidAt && (
+                            <div className="text-sm text-muted-foreground">
+                              Pago em {mensalidade.paidAt.toLocaleDateString('pt-AO')}
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+            {paginationElement}
+            </div>
+          )}
+        </PaginationWrapper>
+      )}
     </div>
   );
 }

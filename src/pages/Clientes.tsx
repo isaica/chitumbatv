@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal, User } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal, User, CreditCard, AlertCircle, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,10 +12,20 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { mockClients, mockFiliais, mockPlans } from '@/data/mock';
-import { Client } from '@/types';
+import { mockClients, mockFiliais, mockMensalidades } from '@/data/mock';
+import { Client, Mensalidade } from '@/types';
+import { calculateClientPaymentStatus, ClientPaymentStatus, getStatusLabel, getStatusColor } from '@/utils/paymentStatus';
+import { ClientDetailsModal } from '@/components/ui/client-details-modal';
+import { QuickPaymentModal } from '@/components/ui/quick-payment-modal';
 import { useAuth } from '@/contexts/AuthContext';
+import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
+import { NoClients, NoSearchResults } from '@/components/ui/empty-states';
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
+import { MobileTable, MobileCard, MobileActionMenu, StatusBadge } from '@/components/ui/mobile-table';
+import { useResponsive } from '@/hooks/use-responsive';
+import { exportToExcel } from '@/utils/export';
 
 const clientSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -26,7 +36,6 @@ const clientSchema = z.object({
   city: z.string().min(1, 'Cidade é obrigatória'),
   province: z.string().min(1, 'Província é obrigatória'),
   document: z.string().min(1, 'Documento é obrigatório'),
-  planId: z.string().min(1, 'Plano é obrigatório'),
   filialId: z.string().min(1, 'Filial é obrigatória'),
   status: z.enum(['ativo', 'inativo', 'suspenso']),
 });
@@ -35,13 +44,21 @@ type ClientFormData = z.infer<typeof clientSchema>;
 
 export default function Clientes() {
   const { user } = useAuth();
+  const { isMobile } = useResponsive();
   const [clients, setClients] = useState<Client[]>(mockClients);
+  const [mensalidades, setMensalidades] = useState<Mensalidade[]>(mockMensalidades);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'ativo' | 'inativo' | 'suspenso'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pago' | 'atrasado' | 'inadimplente' | 'suspenso' | 'inativo'>('all');
   const [filialFilter, setFilialFilter] = useState<string>('all');
-  const [planFilter, setPlanFilter] = useState<string>('all');
+  const [debtFilter, setDebtFilter] = useState<'all' | 'no_debt' | 'with_debt'>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [detailsClient, setDetailsClient] = useState<Client | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [paymentClient, setPaymentClient] = useState<Client | null>(null);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedClients, setSelectedClients] = useState<string[]>([]);
+  const [quickFilter, setQuickFilter] = useState<'all' | 'suspenso' | 'critico' | 'atrasado' | 'em_dia'>('all');
   const { toast } = useToast();
 
   const {
@@ -64,26 +81,49 @@ export default function Clientes() {
     ? mockFiliais 
     : mockFiliais.filter(f => f.id === user?.filialId);
 
-  const filteredClients = clients.filter((client) => {
+  // Calculate payment status for all clients
+  const clientsWithPaymentStatus = useMemo(() => {
+    return clients.map(client => ({
+      ...client,
+      paymentStatus: calculateClientPaymentStatus(client, mensalidades)
+    }));
+  }, [clients, mensalidades]);
+
+  const filteredClients = clientsWithPaymentStatus.filter((client) => {
     const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          client.phone.includes(searchTerm);
-    const matchesStatus = statusFilter === 'all' || client.status === statusFilter;
+    
+    // Payment status filter
+    const matchesStatus = statusFilter === 'all' || client.paymentStatus.status === statusFilter;
+    
     const matchesFilial = filialFilter === 'all' || client.filialId === filialFilter;
-    const matchesPlan = planFilter === 'all' || client.planId === planFilter;
+    
+    // Debt filter
+    const matchesDebt = debtFilter === 'all' || 
+                        (debtFilter === 'no_debt' && client.paymentStatus.totalDebt === 0) ||
+                        (debtFilter === 'with_debt' && client.paymentStatus.totalDebt > 0);
+    
+    // Quick filter logic
+    let matchesQuickFilter = true;
+    if (quickFilter === 'suspenso') {
+      matchesQuickFilter = client.paymentStatus.status === 'suspenso';
+    } else if (quickFilter === 'critico') {
+      matchesQuickFilter = client.paymentStatus.overdueCount >= 2 && client.paymentStatus.status !== 'suspenso';
+    } else if (quickFilter === 'atrasado') {
+      matchesQuickFilter = (client.paymentStatus.status === 'inadimplente' || client.paymentStatus.overdueCount === 1) && client.paymentStatus.status !== 'suspenso';
+    } else if (quickFilter === 'em_dia') {
+      matchesQuickFilter = client.paymentStatus.status === 'pago';
+    }
     
     // Non-admin users can only see their filial's clients
     const hasAccess = user?.role === 'admin' || client.filialId === user?.filialId;
     
-    return matchesSearch && matchesStatus && matchesFilial && matchesPlan && hasAccess;
+    return matchesSearch && matchesStatus && matchesFilial && matchesDebt && matchesQuickFilter && hasAccess;
   });
 
   const getFilialName = (filialId: string) => {
     return mockFiliais.find(f => f.id === filialId)?.name || 'N/A';
-  };
-
-  const getPlanName = (planId: string) => {
-    return mockPlans.find(p => p.id === planId)?.name || 'N/A';
   };
 
   const handleOpenDialog = (client?: Client) => {
@@ -97,7 +137,6 @@ export default function Clientes() {
       setValue('city', client.address.city);
       setValue('province', client.address.province);
       setValue('document', client.document);
-      setValue('planId', client.planId);
       setValue('filialId', client.filialId);
       setValue('status', client.status);
     } else {
@@ -134,7 +173,6 @@ export default function Clientes() {
                 province: data.province,
               },
               document: data.document,
-              planId: data.planId,
               filialId: data.filialId,
               status: data.status,
             }
@@ -158,7 +196,6 @@ export default function Clientes() {
           province: data.province,
         },
         document: data.document,
-        planId: data.planId,
         filialId: data.filialId,
         status: data.status,
         createdAt: new Date(),
@@ -180,12 +217,137 @@ export default function Clientes() {
     });
   };
 
+  const clearSearch = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setFilialFilter('all');
+    setDebtFilter('all');
+  };
+
+  const handleViewDetails = (client: Client) => {
+    setDetailsClient(client);
+    setIsDetailsOpen(true);
+  };
+
+  const handleRegisterPayment = (clientId: string) => {
+    const client = clients.find(c => c.id === clientId);
+    if (client) {
+      setPaymentClient(client);
+      setIsPaymentModalOpen(true);
+    }
+  };
+
+  const handleConfirmPayment = (mensalidadeIds: string[]) => {
+    // Separate existing IDs from virtual/future ones
+    const existingIds = mensalidadeIds.filter(id => !id.startsWith('virtual-'));
+    const virtualIds = mensalidadeIds.filter(id => id.startsWith('virtual-'));
+    
+    // Create new mensalidades for virtual/future months
+    const newMensalidades: Mensalidade[] = virtualIds.map(id => {
+      // Extract info from ID: virtual-{clientId}-{year}-{month}
+      const parts = id.split('-');
+      const clientId = parts.slice(1, -2).join('-');
+      const year = parseInt(parts[parts.length - 2]);
+      const month = parseInt(parts[parts.length - 1]);
+      
+      const client = clients.find(c => c.id === clientId);
+      const filial = client ? mockFiliais.find(f => f.id === client.filialId) : null;
+      
+      return {
+        id: `${clientId}-${year}-${month}-${Date.now()}`,
+        clientId,
+        month,
+        year,
+        amount: filial?.monthlyPrice || 0,
+        status: 'pago' as const,
+        dueDate: new Date(year, month - 1, 15),
+        paidAt: new Date(),
+        createdAt: new Date()
+      };
+    });
+    
+    // Update state
+    setMensalidades(prev => [
+      ...prev.map(m => 
+        existingIds.includes(m.id) 
+          ? { ...m, status: 'pago' as const, paidAt: new Date() }
+          : m
+      ),
+      ...newMensalidades
+    ]);
+    
+    toast({
+      title: 'Pagamento registrado!',
+      description: `${mensalidadeIds.length} ${mensalidadeIds.length === 1 ? 'mensalidade foi registrada' : 'mensalidades foram registradas'} com sucesso.`,
+    });
+    
+    setIsPaymentModalOpen(false);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedClients.length === filteredClients.length) {
+      setSelectedClients([]);
+    } else {
+      setSelectedClients(filteredClients.map(c => c.id));
+    }
+  };
+
+  const handleSelectClient = (clientId: string) => {
+    setSelectedClients(prev => 
+      prev.includes(clientId)
+        ? prev.filter(id => id !== clientId)
+        : [...prev, clientId]
+    );
+  };
+
+  const handleBulkAction = (action: 'remind' | 'export') => {
+    if (action === 'remind') {
+      toast({
+        title: 'Lembretes enviados',
+        description: `Lembretes foram enviados para ${selectedClients.length} ${selectedClients.length === 1 ? 'cliente' : 'clientes'}.`,
+      });
+    } else if (action === 'export') {
+      const selectedData = clients.filter(c => selectedClients.includes(c.id));
+      exportToExcel({
+        filename: 'clientes_selecionados',
+        title: 'Clientes Selecionados',
+        columns: [
+          { key: 'name', title: 'Nome' },
+          { key: 'phone', title: 'Telefone' },
+          { key: 'email', title: 'Email' },
+        ],
+        data: selectedData,
+      });
+    }
+    setSelectedClients([]);
+  };
+
+  // Calculate quick filter counts
+  const suspendedCount = clientsWithPaymentStatus.filter(c => c.paymentStatus.status === 'suspenso').length;
+  const criticalCount = clientsWithPaymentStatus.filter(c => {
+    return c.paymentStatus.overdueCount >= 2 && c.paymentStatus.status !== 'suspenso';
+  }).length;
+  const overdueCount = clientsWithPaymentStatus.filter(c => {
+    return (c.paymentStatus.status === 'inadimplente' || c.paymentStatus.overdueCount === 1) && c.paymentStatus.status !== 'suspenso';
+  }).length;
+  const paidCount = clientsWithPaymentStatus.filter(c => c.paymentStatus.status === 'pago').length;
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-AO', {
+      style: 'currency',
+      currency: 'AOA'
+    }).format(value);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gradient">Gestão de Clientes</h1>
-          <p className="text-muted-foreground">
+      <Breadcrumbs />
+      
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gradient">Gestão de Clientes</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Gerencie os clientes da Chitumba TV
           </p>
         </div>
@@ -193,7 +355,7 @@ export default function Clientes() {
           <DialogTrigger asChild>
             <Button 
               onClick={() => handleOpenDialog()}
-              className="gradient-primary shadow-primary"
+              className="gradient-primary shadow-primary w-full sm:w-auto"
             >
               <Plus className="w-4 h-4 mr-2" />
               Novo Cliente
@@ -212,7 +374,7 @@ export default function Clientes() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nome Completo</Label>
                   <Input
@@ -239,7 +401,7 @@ export default function Clientes() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="phone">Telefone</Label>
                   <Input
@@ -280,7 +442,7 @@ export default function Clientes() {
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="neighborhood">Bairro</Label>
                   <Input
@@ -319,22 +481,7 @@ export default function Clientes() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="planId">Plano</Label>
-                  <Select onValueChange={(value) => setValue('planId', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o plano" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mockPlans.map((plan) => (
-                        <SelectItem key={plan.id} value={plan.id}>
-                          {plan.name} - {plan.price.toLocaleString()} AOA
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="filialId">Filial</Label>
                   <Select onValueChange={(value) => setValue('filialId', value)}>
@@ -365,7 +512,7 @@ export default function Clientes() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
                 <Button type="button" variant="outline" onClick={handleCloseDialog}>
                   Cancelar
                 </Button>
@@ -383,8 +530,48 @@ export default function Clientes() {
         <CardHeader>
           <CardTitle className="text-lg">Filtros</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <CardContent className="space-y-4">
+          {/* Quick Filters */}
+          <div className="flex flex-wrap gap-2">
+            <Badge 
+              variant={quickFilter === 'all' ? 'default' : 'outline'}
+              className="cursor-pointer px-4 py-2 text-sm hover:bg-primary/90 transition-colors"
+              onClick={() => setQuickFilter('all')}
+            >
+              Todos ({clientsWithPaymentStatus.length})
+            </Badge>
+            <Badge 
+              variant={quickFilter === 'suspenso' ? 'destructive' : 'outline'}
+              className="cursor-pointer px-4 py-2 text-sm hover:bg-destructive/90 transition-colors"
+              onClick={() => setQuickFilter('suspenso')}
+            >
+              🔴 Suspensos ({suspendedCount})
+            </Badge>
+            <Badge 
+              variant={quickFilter === 'critico' ? 'default' : 'outline'}
+              className="cursor-pointer px-4 py-2 text-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+              onClick={() => setQuickFilter('critico')}
+            >
+              🟠 Críticos ({criticalCount})
+            </Badge>
+            <Badge 
+              variant={quickFilter === 'atrasado' ? 'default' : 'outline'}
+              className="cursor-pointer px-4 py-2 text-sm bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500"
+              onClick={() => setQuickFilter('atrasado')}
+            >
+              🟡 Atrasados ({overdueCount})
+            </Badge>
+            <Badge 
+              variant={quickFilter === 'em_dia' ? 'default' : 'outline'}
+              className="cursor-pointer px-4 py-2 text-sm bg-success hover:bg-success/90 text-white border-success"
+              onClick={() => setQuickFilter('em_dia')}
+            >
+              🟢 Em Dia ({paidCount})
+            </Badge>
+          </div>
+
+          {/* Search and Filters */}
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
@@ -396,13 +583,25 @@ export default function Clientes() {
             </div>
             <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
               <SelectTrigger>
-                <SelectValue placeholder="Status" />
+                <SelectValue placeholder="Status de Pagamento" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="ativo">Ativo</SelectItem>
-                <SelectItem value="inativo">Inativo</SelectItem>
+                <SelectItem value="pago">Em Dia</SelectItem>
+                <SelectItem value="atrasado">Atrasado</SelectItem>
+                <SelectItem value="inadimplente">Inadimplente</SelectItem>
                 <SelectItem value="suspenso">Suspenso</SelectItem>
+                <SelectItem value="inativo">Inativo</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={debtFilter} onValueChange={(value: any) => setDebtFilter(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Situação de Dívida" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Situações</SelectItem>
+                <SelectItem value="no_debt">Sem Dívidas</SelectItem>
+                <SelectItem value="with_debt">Com Dívidas</SelectItem>
               </SelectContent>
             </Select>
             {user?.role === 'admin' && (
@@ -420,116 +619,289 @@ export default function Clientes() {
                 </SelectContent>
               </Select>
             )}
-            <Select value={planFilter} onValueChange={setPlanFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Plano" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Planos</SelectItem>
-                {mockPlans.map((plan) => (
-                  <SelectItem key={plan.id} value={plan.id}>
-                    {plan.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
+
+          {/* Bulk Actions */}
+          {selectedClients.length > 0 && (
+            <div className="flex flex-wrap gap-2 items-center p-3 bg-muted/50 rounded-lg">
+              <Checkbox
+                checked={selectedClients.length === filteredClients.length && filteredClients.length > 0}
+                onCheckedChange={handleSelectAll}
+              />
+              <span className="text-sm font-medium flex-1">
+                {selectedClients.length} {selectedClients.length === 1 ? 'cliente selecionado' : 'clientes selecionados'}
+              </span>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => handleBulkAction('remind')}
+              >
+                Enviar Lembretes
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkAction('export')}
+              >
+                Exportar Seleção
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Results */}
-      <Card className="border-0 shadow-primary">
-        <CardHeader>
-          <CardTitle>
-            Clientes ({filteredClients.length})
-          </CardTitle>
-          <CardDescription>
-            Lista de clientes da Chitumba TV
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Contato</TableHead>
-                <TableHead>Plano</TableHead>
-                {user?.role === 'admin' && <TableHead>Filial</TableHead>}
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredClients.map((client) => (
-                <TableRow key={client.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <User className="w-4 h-4 text-primary" />
-                      </div>
-                      <div>
-                        <div className="font-medium">{client.name}</div>
-                        <div className="text-sm text-muted-foreground">{client.document}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div>{client.phone}</div>
-                      <div className="text-muted-foreground">{client.email}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {getPlanName(client.planId)}
-                    </Badge>
-                  </TableCell>
-                  {user?.role === 'admin' && (
-                    <TableCell>{getFilialName(client.filialId)}</TableCell>
-                  )}
-                  <TableCell>
-                    <Badge 
-                      variant={
-                        client.status === 'ativo' ? 'default' :
-                        client.status === 'suspenso' ? 'destructive' :
-                        'secondary'
-                      }
-                    >
-                      {client.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Eye className="w-4 h-4 mr-2" />
-                          Ver Detalhes
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenDialog(client)}>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="text-destructive"
-                          onClick={() => handleDelete(client)}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {filteredClients.length === 0 ? (
+        searchTerm || statusFilter !== 'all' || filialFilter !== 'all' || debtFilter !== 'all' ? (
+          <NoSearchResults searchTerm={searchTerm} onClear={clearSearch} />
+        ) : (
+          <NoClients onCreate={() => handleOpenDialog()} />
+        )
+      ) : (
+        <PaginationWrapper data={filteredClients} itemsPerPage={isMobile ? 5 : 10}>
+          {(paginatedClients, paginationInfo, paginationElement) => (
+            <div className="space-y-4">
+              <Card className="border-0 shadow-primary">
+                <CardHeader>
+                  <CardTitle>
+                    Clientes ({paginationInfo.totalItems})
+                  </CardTitle>
+                <CardDescription>
+                  Lista de clientes da Chitumba TV
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isMobile ? (
+                  <MobileTable 
+                    data={paginatedClients}
+                    emptyMessage="Nenhum cliente encontrado"
+                    renderCard={(client) => (
+                      <MobileCard
+                        key={client.id}
+                        actions={
+                          <MobileActionMenu
+                            actions={[
+                              {
+                                label: 'Ver Detalhes',
+                                onClick: () => handleViewDetails(client),
+                              },
+                              {
+                                label: 'Registrar Pagamento',
+                                onClick: () => handleRegisterPayment(client.id),
+                              },
+                              {
+                                label: 'Editar',
+                                onClick: () => handleOpenDialog(client),
+                              },
+                              {
+                                label: 'Excluir',
+                                onClick: () => handleDelete(client),
+                                variant: 'destructive' as const,
+                              },
+                            ]}
+                          />
+                        }
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-semibold text-lg">{client.name}</h3>
+                            <Badge className={`${getStatusColor(client.paymentStatus.status)} border text-xs`}>
+                              {getStatusLabel(client.paymentStatus.status)}
+                            </Badge>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <p className="text-muted-foreground">Telefone</p>
+                              <p className="font-medium">{client.phone}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Email</p>
+                              <p className="font-medium truncate">{client.email}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Filial</p>
+                              <p className="font-medium">{getFilialName(client.filialId)}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Documento</p>
+                              <p className="font-medium">{client.document}</p>
+                            </div>
+                          </div>
+
+                          {client.paymentStatus.totalDebt > 0 && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <AlertCircle className="w-4 h-4 text-red-600" />
+                                  <span className="text-sm font-medium text-red-700">Dívida Pendente</span>
+                                </div>
+                                <span className="text-sm font-bold text-red-600">
+                                  {formatCurrency(client.paymentStatus.totalDebt)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-red-600">
+                                {client.paymentStatus.overdueCount} mês(es) em atraso
+                              </p>
+                            </div>
+                          )}
+
+                          {client.paymentStatus.status === 'pago' && (
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+                              <CreditCard className="w-4 h-4 text-green-600" />
+                              <span className="text-sm font-medium text-green-700">Todas as mensalidades em dia</span>
+                            </div>
+                          )}
+                        </div>
+                      </MobileCard>
+                    )}
+                  />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Cliente</TableHead>
+                          <TableHead>Contato</TableHead>
+                          <TableHead>Status de Pagamento</TableHead>
+                          <TableHead>Dívida</TableHead>
+                          <TableHead>Filial</TableHead>
+                          <TableHead>Documento</TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedClients.map((client) => (
+                          <TableRow 
+                            key={client.id} 
+                            className={`hover:bg-muted/50 transition-colors ${
+                              client.paymentStatus.status === 'suspenso' ? 'critical-row' :
+                              client.paymentStatus.overdueCount >= 2 ? 'warning-row' : ''
+                            }`}
+                          >
+                            <TableCell>
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/70 rounded-full flex items-center justify-center text-primary-foreground font-semibold text-sm">
+                                  {client.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                                </div>
+                                <div>
+                                  <p className="font-medium">{client.name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Cliente desde {new Date(client.createdAt).toLocaleDateString('pt-BR')}
+                                  </p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium">{client.phone}</p>
+                                <p className="text-sm text-muted-foreground">{client.email}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-2">
+                                <Badge className={`${getStatusColor(client.paymentStatus.status)} border`}>
+                                  {getStatusLabel(client.paymentStatus.status)}
+                                </Badge>
+                                {client.paymentStatus.overdueCount > 0 && (
+                                  <div className="flex items-center gap-1 text-xs text-red-600">
+                                    <AlertCircle className="w-3 h-3" />
+                                    <span>{client.paymentStatus.overdueCount} mês(es)</span>
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {client.paymentStatus.totalDebt > 0 ? (
+                                <div className="space-y-1">
+                                  <p className="font-semibold text-red-600">
+                                    {formatCurrency(client.paymentStatus.totalDebt)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {client.paymentStatus.overdueMonths.slice(0, 2).join(', ')}
+                                    {client.paymentStatus.overdueMonths.length > 2 && '...'}
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 text-green-600">
+                                  <CreditCard className="w-4 h-4" />
+                                  <span className="text-sm font-medium">Em dia</span>
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-medium">{getFilialName(client.filialId)}</span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-mono text-sm">{client.document}</span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleViewDetails(client)}>
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    Ver Detalhes
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleRegisterPayment(client.id)}>
+                                    <CreditCard className="w-4 h-4 mr-2" />
+                                    Registrar Pagamento
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleOpenDialog(client)}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Editar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    className="text-destructive"
+                                    onClick={() => handleDelete(client)}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Excluir
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            {paginationElement}
+            </div>
+          )}
+        </PaginationWrapper>
+      )}
+
+      {/* Client Details Modal */}
+      <ClientDetailsModal
+        client={detailsClient}
+        isOpen={isDetailsOpen}
+        onClose={() => setIsDetailsOpen(false)}
+        paymentStatus={detailsClient ? calculateClientPaymentStatus(detailsClient, mensalidades) : {} as ClientPaymentStatus}
+        mensalidades={mensalidades}
+        onRegisterPayment={handleRegisterPayment}
+      />
+
+      {/* Quick Payment Modal */}
+      {paymentClient && (
+        <QuickPaymentModal
+          open={isPaymentModalOpen}
+          onClose={() => {
+            setIsPaymentModalOpen(false);
+            setPaymentClient(null);
+          }}
+          client={paymentClient}
+          mensalidades={mensalidades}
+          onPayment={handleConfirmPayment}
+        />
+      )}
     </div>
   );
 }
