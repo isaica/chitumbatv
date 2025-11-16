@@ -240,7 +240,7 @@ export default function Dashboard() {
 
     exportToPDF({
       filename: `dashboard_${new Date().toISOString().split('T')[0]}`,
-      title: 'Dashboard - Chitumba TV',
+      title: 'Dashboard - ALF Chitumba',
       subtitle: `Relatório gerado em ${new Date().toLocaleString('pt-AO')}`,
       columns: [
         { key: 'metric', title: 'Métrica' },
@@ -289,7 +289,7 @@ export default function Dashboard() {
                 <CardTitle className="text-lg">Clientes que Requerem Atenção</CardTitle>
               </div>
               <Badge variant="destructive" className="text-sm">
-                {totalOverdueClients} Inadimplentes
+                {totalOverdueClients} Kilapeiros
               </Badge>
             </div>
             <CardDescription>
@@ -338,7 +338,7 @@ export default function Dashboard() {
                 variant="destructive"
                 onClick={() => navigate('/clientes')}
               >
-                Ver Todos os Inadimplentes ({totalOverdueClients})
+                Ver Todos os Kilapeiros ({totalOverdueClients})
               </Button>
             </div>
           </CardContent>
@@ -372,7 +372,7 @@ export default function Dashboard() {
           trendValue="+12.5%"
         />
         <MetricCard
-          title="Inadimplentes Críticos"
+          title="Kilapeiros Críticos"
           value={totalOverdueClients}
           description="clientes com atraso"
           icon={AlertTriangle}
@@ -625,7 +625,7 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle>Visão Geral das Filiais</CardTitle>
             <CardDescription>
-              Status e performance das filiais da Chitumba TV
+              Status e performance das filiais da ALF Chitumba
             </CardDescription>
           </CardHeader>
           <CardContent>

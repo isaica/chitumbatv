@@ -2,10 +2,12 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  phone: string;
   role: 'admin' | 'gerente' | 'funcionario';
   filialId?: string;
   avatar?: string;
   isActive: boolean;
+  password?: string;
   createdAt: Date;
 }
 

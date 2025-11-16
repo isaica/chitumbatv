@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,6 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { mockClients, mockFiliais, mockMensalidades } from '@/data/mock';
+import { loadOrInit, set as storageSet } from '@/services/storage';
+import { confirmPayments } from '@/services/payments';
 import { Client, Mensalidade } from '@/types';
 import { calculateClientPaymentStatus, ClientPaymentStatus, getStatusLabel, getStatusColor } from '@/utils/paymentStatus';
 import { ClientDetailsModal } from '@/components/ui/client-details-modal';
@@ -26,6 +28,9 @@ import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { MobileTable, MobileCard, MobileActionMenu, StatusBadge } from '@/components/ui/mobile-table';
 import { useResponsive } from '@/hooks/use-responsive';
 import { exportToExcel } from '@/utils/export';
+import { generateReceipt } from '@/utils/receipt';
+import { VirtualTableBody } from '@/components/ui/virtual-table-body';
+import { useRef } from 'react';
 
 const clientSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -42,11 +47,21 @@ const clientSchema = z.object({
 
 type ClientFormData = z.infer<typeof clientSchema>;
 
+function reviveMensalidades(data: Mensalidade[]): Mensalidade[] {
+  return data.map(m => ({
+    ...m,
+    dueDate: new Date(m.dueDate as any),
+    paidAt: m.paidAt ? new Date(m.paidAt as any) : undefined,
+    createdAt: new Date(m.createdAt as any),
+  }));
+}
+
 export default function Clientes() {
   const { user } = useAuth();
   const { isMobile } = useResponsive();
-  const [clients, setClients] = useState<Client[]>(mockClients);
-  const [mensalidades, setMensalidades] = useState<Mensalidade[]>(mockMensalidades);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const [clients, setClients] = useState<Client[]>(loadOrInit('clients', mockClients).map(c => ({ ...c, createdAt: new Date(c.createdAt as any) })));
+  const [mensalidades, setMensalidades] = useState<Mensalidade[]>(reviveMensalidades(loadOrInit('mensalidades', mockMensalidades)));
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pago' | 'atrasado' | 'inadimplente' | 'suspenso' | 'inativo'>('all');
   const [filialFilter, setFilialFilter] = useState<string>('all');
@@ -60,6 +75,14 @@ export default function Clientes() {
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [quickFilter, setQuickFilter] = useState<'all' | 'suspenso' | 'critico' | 'atrasado' | 'em_dia'>('all');
   const { toast } = useToast();
+
+  useEffect(() => {
+    storageSet('clients', clients);
+  }, [clients]);
+
+  useEffect(() => {
+    storageSet('mensalidades', mensalidades);
+  }, [mensalidades]);
 
   const {
     register,
@@ -89,22 +112,19 @@ export default function Clientes() {
     }));
   }, [clients, mensalidades]);
 
-  const filteredClients = clientsWithPaymentStatus.filter((client) => {
+  const filteredClients = useMemo(() => clientsWithPaymentStatus.filter((client) => {
     const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          client.phone.includes(searchTerm);
     
-    // Payment status filter
     const matchesStatus = statusFilter === 'all' || client.paymentStatus.status === statusFilter;
     
     const matchesFilial = filialFilter === 'all' || client.filialId === filialFilter;
     
-    // Debt filter
     const matchesDebt = debtFilter === 'all' || 
                         (debtFilter === 'no_debt' && client.paymentStatus.totalDebt === 0) ||
                         (debtFilter === 'with_debt' && client.paymentStatus.totalDebt > 0);
     
-    // Quick filter logic
     let matchesQuickFilter = true;
     if (quickFilter === 'suspenso') {
       matchesQuickFilter = client.paymentStatus.status === 'suspenso';
@@ -116,11 +136,10 @@ export default function Clientes() {
       matchesQuickFilter = client.paymentStatus.status === 'pago';
     }
     
-    // Non-admin users can only see their filial's clients
     const hasAccess = user?.role === 'admin' || client.filialId === user?.filialId;
     
     return matchesSearch && matchesStatus && matchesFilial && matchesDebt && matchesQuickFilter && hasAccess;
-  });
+  }), [clientsWithPaymentStatus, searchTerm, statusFilter, filialFilter, debtFilter, quickFilter, user]);
 
   const getFilialName = (filialId: string) => {
     return mockFiliais.find(f => f.id === filialId)?.name || 'N/A';
@@ -238,43 +257,7 @@ export default function Clientes() {
   };
 
   const handleConfirmPayment = (mensalidadeIds: string[]) => {
-    // Separate existing IDs from virtual/future ones
-    const existingIds = mensalidadeIds.filter(id => !id.startsWith('virtual-'));
-    const virtualIds = mensalidadeIds.filter(id => id.startsWith('virtual-'));
-    
-    // Create new mensalidades for virtual/future months
-    const newMensalidades: Mensalidade[] = virtualIds.map(id => {
-      // Extract info from ID: virtual-{clientId}-{year}-{month}
-      const parts = id.split('-');
-      const clientId = parts.slice(1, -2).join('-');
-      const year = parseInt(parts[parts.length - 2]);
-      const month = parseInt(parts[parts.length - 1]);
-      
-      const client = clients.find(c => c.id === clientId);
-      const filial = client ? mockFiliais.find(f => f.id === client.filialId) : null;
-      
-      return {
-        id: `${clientId}-${year}-${month}-${Date.now()}`,
-        clientId,
-        month,
-        year,
-        amount: filial?.monthlyPrice || 0,
-        status: 'pago' as const,
-        dueDate: new Date(year, month - 1, 15),
-        paidAt: new Date(),
-        createdAt: new Date()
-      };
-    });
-    
-    // Update state
-    setMensalidades(prev => [
-      ...prev.map(m => 
-        existingIds.includes(m.id) 
-          ? { ...m, status: 'pago' as const, paidAt: new Date() }
-          : m
-      ),
-      ...newMensalidades
-    ]);
+    setMensalidades(prev => confirmPayments(mensalidadeIds, clients, prev));
     
     toast({
       title: 'Pagamento registrado!',
@@ -339,6 +322,13 @@ export default function Clientes() {
     }).format(value);
   };
 
+  const getCurrentPaidMensalidade = (clientId: string) => {
+    const today = new Date();
+    const month = today.getMonth() + 1;
+    const year = today.getFullYear();
+    return mensalidades.find(m => m.clientId === clientId && m.month === month && m.year === year && m.status === 'pago');
+  };
+
   return (
     <div className="space-y-6">
       <Breadcrumbs />
@@ -348,7 +338,7 @@ export default function Clientes() {
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-bold text-gradient">Gestão de Clientes</h1>
           <p className="text-muted-foreground text-sm sm:text-base">
-            Gerencie os clientes da Chitumba TV
+            Gerencie os clientes da ALF Chitumba
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -589,7 +579,7 @@ export default function Clientes() {
                 <SelectItem value="all">Todos os Status</SelectItem>
                 <SelectItem value="pago">Em Dia</SelectItem>
                 <SelectItem value="atrasado">Atrasado</SelectItem>
-                <SelectItem value="inadimplente">Inadimplente</SelectItem>
+                <SelectItem value="inadimplente">Kilapeiro</SelectItem>
                 <SelectItem value="suspenso">Suspenso</SelectItem>
                 <SelectItem value="inativo">Inativo</SelectItem>
               </SelectContent>
@@ -667,7 +657,7 @@ export default function Clientes() {
                     Clientes ({paginationInfo.totalItems})
                   </CardTitle>
                 <CardDescription>
-                  Lista de clientes da Chitumba TV
+                  Lista de clientes da ALF Chitumba
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -758,7 +748,8 @@ export default function Clientes() {
                   />
                 ) : (
                   <div className="overflow-x-auto">
-                    <Table>
+                    <div style={{ maxHeight: 520, overflowY: 'auto' }} ref={tableScrollRef}>
+                    <Table className="min-w-full">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Cliente</TableHead>
@@ -770,8 +761,12 @@ export default function Clientes() {
                           <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
-                      <TableBody>
-                        {paginatedClients.map((client) => (
+                      <VirtualTableBody
+                        items={paginatedClients}
+                        height={520}
+                        rowHeight={64}
+                        containerRef={tableScrollRef}
+                        renderRow={(client) => (
                           <TableRow 
                             key={client.id} 
                             className={`hover:bg-muted/50 transition-colors ${
@@ -800,9 +795,16 @@ export default function Clientes() {
                             </TableCell>
                             <TableCell>
                               <div className="space-y-2">
-                                <Badge className={`${getStatusColor(client.paymentStatus.status)} border`}>
-                                  {getStatusLabel(client.paymentStatus.status)}
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                  <Badge className={`${getStatusColor(client.paymentStatus.status)} border`}>
+                                    {getStatusLabel(client.paymentStatus.status)}
+                                  </Badge>
+                                  {getCurrentPaidMensalidade(client.id) && (
+                                    <Button size="sm" variant="outline" onClick={() => generateReceipt(getCurrentPaidMensalidade(client.id)!)}>
+                                      Recibo
+                                    </Button>
+                                  )}
+                                </div>
                                 {client.paymentStatus.overdueCount > 0 && (
                                   <div className="flex items-center gap-1 text-xs text-red-600">
                                     <AlertCircle className="w-3 h-3" />
@@ -866,9 +868,10 @@ export default function Clientes() {
                               </DropdownMenu>
                             </TableCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
+                        )}
+                      />
                     </Table>
+                    </div>
                   </div>
                 )}
               </CardContent>

@@ -52,7 +52,7 @@ export function NoClients({ onCreate }: { onCreate: () => void }) {
     <EmptyState
       icon={<Users className="w-12 h-12 text-muted-foreground" />}
       title="Nenhum cliente cadastrado"
-      description="Comece adicionando o primeiro cliente ao sistema da Chitumba TV. É rápido e fácil!"
+      description="Comece adicionando o primeiro cliente ao sistema da ALF Chitumba. É rápido e fácil!"
       action={{
         label: "Novo Cliente",
         onClick: onCreate
@@ -66,7 +66,7 @@ export function NoFiliais({ onCreate }: { onCreate: () => void }) {
     <EmptyState
       icon={<Building2 className="w-12 h-12 text-muted-foreground" />}
       title="Nenhuma filial cadastrada"
-      description="Cadastre a primeira filial da Chitumba TV para começar a organizar seus clientes."
+      description="Cadastre a primeira filial da ALF Chitumba para começar a organizar seus clientes."
       action={{
         label: "Nova Filial",
         onClick: onCreate

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, CheckCircle, Clock, AlertTriangle, Calendar, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,17 +14,38 @@ import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
 import { NoMensalidades, NoSearchResults } from '@/components/ui/empty-states';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { QuickPaymentModal } from '@/components/ui/quick-payment-modal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { confirmPayments } from '@/services/payments';
+import { loadOrInit, set as storageSet, get as storageGet } from '@/services/storage';
+import { generateReceipt } from '@/utils/receipt';
+import { VirtualTableBody } from '@/components/ui/virtual-table-body';
+import { useRef } from 'react';
+
+function reviveMensalidades(data: Mensalidade[]): Mensalidade[] {
+  return data.map(m => ({
+    ...m,
+    dueDate: new Date(m.dueDate as any),
+    paidAt: m.paidAt ? new Date(m.paidAt as any) : undefined,
+    createdAt: new Date(m.createdAt as any),
+  }));
+}
 
 export default function Mensalidades() {
   const { user } = useAuth();
-  const [mensalidades, setMensalidades] = useState<Mensalidade[]>(mockMensalidades);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const [mensalidades, setMensalidades] = useState<Mensalidade[]>(reviveMensalidades(loadOrInit('mensalidades', mockMensalidades)));
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pago' | 'pendente' | 'atrasado'>('all');
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [filialFilter, setFilialFilter] = useState<string>('all');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
+  const [isClientPickerOpen, setIsClientPickerOpen] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    storageSet('mensalidades', mensalidades);
+  }, [mensalidades]);
 
   // Filter mensalidades based on user role
   const userFilialClients = user?.role === 'admin' 
@@ -64,6 +85,7 @@ export default function Mensalidades() {
   };
 
   const handleMarkAsPaid = (mensalidadeId: string) => {
+    const target = mensalidades.find(m => m.id === mensalidadeId);
     setMensalidades(prev => prev.map(m => 
       m.id === mensalidadeId 
         ? { ...m, status: 'pago' as const, paidAt: new Date() }
@@ -74,46 +96,11 @@ export default function Mensalidades() {
       title: 'Mensalidade marcada como paga',
       description: 'O pagamento foi registrado com sucesso.',
     });
+    if (target) generateReceipt({ ...target, status: 'pago', paidAt: new Date() });
   };
 
   const handlePayment = (mensalidadeIds: string[]) => {
-    // Separate existing IDs from virtual/future ones
-    const existingIds = mensalidadeIds.filter(id => !id.startsWith('virtual-'));
-    const virtualIds = mensalidadeIds.filter(id => id.startsWith('virtual-'));
-    
-    // Create new mensalidades for virtual/future months
-    const newMensalidades: Mensalidade[] = virtualIds.map(id => {
-      // Extract info from ID: virtual-{clientId}-{year}-{month}
-      const parts = id.split('-');
-      const clientId = parts.slice(1, -2).join('-');
-      const year = parseInt(parts[parts.length - 2]);
-      const month = parseInt(parts[parts.length - 1]);
-      
-      const client = mockClients.find(c => c.id === clientId);
-      const filial = client ? mockFiliais.find(f => f.id === client.filialId) : null;
-      
-      return {
-        id: `${clientId}-${year}-${month}-${Date.now()}`,
-        clientId,
-        month,
-        year,
-        amount: filial?.monthlyPrice || 0,
-        status: 'pago' as const,
-        dueDate: new Date(year, month - 1, 15),
-        paidAt: new Date(),
-        createdAt: new Date()
-      };
-    });
-    
-    // Update state
-    setMensalidades(prev => [
-      ...prev.map(m => 
-        existingIds.includes(m.id) 
-          ? { ...m, status: 'pago' as const, paidAt: new Date() }
-          : m
-      ),
-      ...newMensalidades
-    ]);
+    setMensalidades(prev => confirmPayments(mensalidadeIds, mockClients, prev));
     
     toast({
       title: 'Pagamento registrado!',
@@ -129,6 +116,17 @@ export default function Mensalidades() {
       setSelectedClientForPayment(client);
       setIsPaymentModalOpen(true);
     }
+  };
+
+  const handleOpenGlobalPayment = () => {
+    setIsClientPickerOpen(true);
+  };
+
+  const handleClientPicked = (clientId: string) => {
+    const client = mockClients.find(c => c.id === clientId) || null;
+    setSelectedClientForPayment(client);
+    setIsClientPickerOpen(false);
+    setIsPaymentModalOpen(!!client);
   };
 
   const getStatusIcon = (status: string) => {
@@ -180,9 +178,13 @@ export default function Mensalidades() {
         <div>
           <h1 className="text-3xl font-bold text-gradient">Gestão de Mensalidades</h1>
           <p className="text-muted-foreground">
-            Controle os pagamentos dos clientes da Chitumba TV
+            Controle os pagamentos dos clientes da ALF Chitumba
           </p>
         </div>
+        <Button className="gradient-primary" onClick={handleOpenGlobalPayment}>
+          <CreditCard className="w-4 h-4 mr-2" />
+          Registrar Pagamento
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -318,23 +320,23 @@ export default function Mensalidades() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
+                <Table className="w-full table-fixed">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Período</TableHead>
-                      <TableHead>Valor</TableHead>
-                      {user?.role === 'admin' && <TableHead>Filial</TableHead>}
-                      <TableHead>Vencimento</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
+                      <TableHead className="w-[220px]">Cliente</TableHead>
+                      <TableHead className="w-[170px]">Período</TableHead>
+                      <TableHead className="w-[120px]">Valor</TableHead>
+                      {user?.role === 'admin' && <TableHead className="w-[160px]">Filial</TableHead>}
+                      <TableHead className="w-[140px]">Vencimento</TableHead>
+                      <TableHead className="w-[120px]">Status</TableHead>
+                      <TableHead className="w-[220px] text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedMensalidades.map((mensalidade) => (
                       <TableRow key={mensalidade.id}>
                         <TableCell>
-                          <div className="font-medium">{getClientName(mensalidade.clientId)}</div>
+                          <div className="font-medium truncate">{getClientName(mensalidade.clientId)}</div>
                         </TableCell>
                         <TableCell>
                           {new Date(mensalidade.year, mensalidade.month - 1).toLocaleDateString('pt-AO', {
@@ -343,13 +345,13 @@ export default function Mensalidades() {
                           })}
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium">{mensalidade.amount.toLocaleString()} AOA</span>
+                          <span className="font-medium whitespace-nowrap">{mensalidade.amount.toLocaleString()} AOA</span>
                         </TableCell>
                         {user?.role === 'admin' && (
-                          <TableCell>{getClientFilial(mensalidade.clientId)}</TableCell>
+                          <TableCell className="truncate">{getClientFilial(mensalidade.clientId)}</TableCell>
                         )}
                         <TableCell>
-                          {mensalidade.dueDate.toLocaleDateString('pt-AO')}
+                          <span className="whitespace-nowrap">{mensalidade.dueDate.toLocaleDateString('pt-AO')}</span>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -387,8 +389,13 @@ export default function Mensalidades() {
                             </div>
                           )}
                           {mensalidade.status === 'pago' && mensalidade.paidAt && (
-                            <div className="text-sm text-muted-foreground">
-                              Pago em {mensalidade.paidAt.toLocaleDateString('pt-AO')}
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="text-sm text-muted-foreground mr-2 whitespace-nowrap">
+                                Pago em {mensalidade.paidAt.toLocaleDateString('pt-AO')}
+                              </div>
+                              <Button size="sm" variant="outline" onClick={() => generateReceipt(mensalidade)}>
+                                Recibo
+                              </Button>
                             </div>
                           )}
                         </TableCell>
@@ -415,6 +422,26 @@ export default function Mensalidades() {
           onPayment={handlePayment}
         />
       )}
+
+      <Dialog open={isClientPickerOpen} onOpenChange={setIsClientPickerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Selecionar Cliente</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <Select onValueChange={handleClientPicked}>
+              <SelectTrigger>
+                <SelectValue placeholder="Escolha um cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                {(user?.role === 'admin' ? mockClients : mockClients.filter(c => c.filialId === user?.filialId)).map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

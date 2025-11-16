@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User } from '@/types';
 import { mockUsers } from '@/data/mock';
+import { get as storageGet, set as storageSet } from '@/services/storage';
 
 interface AuthContextType {
   user: User | null;
@@ -43,10 +44,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Mock authentication
-    const foundUser = mockUsers.find(u => u.email === email);
+    const storedUsers = storageGet<User[]>('usuarios') || mockUsers;
+    const foundUser = storedUsers.find(u => u.email === email);
     
-    if (foundUser && password === '123456') {
+    if (foundUser && (!foundUser.password || foundUser.password === password)) {
       setUser(foundUser);
       
       if (rememberMe) {

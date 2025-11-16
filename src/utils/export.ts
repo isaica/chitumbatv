@@ -29,7 +29,7 @@ export interface ExportOptions {
 
 // PDF Export
 export const exportToPDF = (options: ExportOptions) => {
-  const { filename, title, subtitle, columns, data, author = 'Sistema Chitumba TV', orientation = 'portrait' } = options;
+  const { filename, title, subtitle, columns, data, author = 'ALF Chitumba', orientation = 'portrait' } = options;
 
   const doc = new jsPDF({
     orientation,
@@ -161,7 +161,7 @@ export const exportToCSV = (options: ExportOptions) => {
 export const exportClients = (clients: any[], format: 'pdf' | 'excel' | 'csv' = 'pdf') => {
   const options: ExportOptions = {
     filename: `clientes_${new Date().toISOString().split('T')[0]}`,
-    title: 'Lista de Clientes - Chitumba TV',
+    title: 'Lista de Clientes - ALF Chitumba',
     subtitle: 'Relatório completo de clientes cadastrados',
     columns: [
       { key: 'name', title: 'Nome', width: 40 },
@@ -189,7 +189,7 @@ export const exportClients = (clients: any[], format: 'pdf' | 'excel' | 'csv' = 
 export const exportMensalidades = (mensalidades: any[], format: 'pdf' | 'excel' | 'csv' = 'pdf') => {
   const options: ExportOptions = {
     filename: `mensalidades_${new Date().toISOString().split('T')[0]}`,
-    title: 'Relatório de Mensalidades - Chitumba TV',
+    title: 'Relatório de Mensalidades - ALF Chitumba',
     subtitle: 'Detalhamento de pagamentos e pendências',
     columns: [
       { key: 'clientName', title: 'Cliente', width: 40 },
@@ -219,7 +219,7 @@ export const exportMensalidades = (mensalidades: any[], format: 'pdf' | 'excel' 
 export const exportFiliais = (filiais: any[], format: 'pdf' | 'excel' | 'csv' = 'pdf') => {
   const options: ExportOptions = {
     filename: `filiais_${new Date().toISOString().split('T')[0]}`,
-    title: 'Lista de Filiais - Chitumba TV',
+    title: 'Lista de Filiais - ALF Chitumba',
     subtitle: 'Relatório de filiais cadastradas',
     columns: [
       { key: 'name', title: 'Nome', width: 40 },

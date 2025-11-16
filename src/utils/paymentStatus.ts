@@ -130,7 +130,7 @@ export function getStatusLabel(status: ClientPaymentStatus['status']): string {
     case 'atrasado':
       return 'Atrasado';
     case 'inadimplente':
-      return 'Inadimplente';
+      return 'Kilapeiro';
     case 'suspenso':
       return 'Suspenso';
     case 'inativo':

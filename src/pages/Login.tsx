@@ -33,8 +33,8 @@ export default function Login() {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'admin@chitumba.ao',
-      password: '123456',
+      email: '',
+      password: '',
       rememberMe: false,
     }
   });
@@ -67,9 +67,9 @@ export default function Login() {
             <Tv className="w-8 h-8 text-white" />
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold text-gradient">Chitumba TV</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gradient">ALF Chitumba</CardTitle>
             <CardDescription className="text-muted-foreground">
-              Sistema de Gestão de TV Comunitária
+              A melhor TV
             </CardDescription>
           </div>
         </CardHeader>
@@ -148,14 +148,7 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-            <p className="text-sm text-muted-foreground mb-2">Credenciais de teste:</p>
-            <div className="text-xs space-y-1">
-              <p><strong>Admin:</strong> admin@chitumba.ao / 123456</p>
-              <p><strong>Gerente:</strong> joao@chitumba.ao / 123456</p>
-              <p><strong>Funcionário:</strong> carlos@chitumba.ao / 123456</p>
-            </div>
-          </div>
+          
         </CardContent>
       </Card>
     </div>

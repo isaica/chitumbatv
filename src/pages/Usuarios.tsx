@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { mockUsers, mockFiliais } from '@/data/mock';
+import { loadOrInit, set as storageSet } from '@/services/storage';
 import { User } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
@@ -28,13 +29,15 @@ const userSchema = z.object({
   role: z.enum(['admin', 'gerente', 'funcionario']),
   filialId: z.string().optional(),
   isActive: z.boolean(),
+  phone: z.string().optional(),
 });
 
 type UserFormData = z.infer<typeof userSchema>;
 
 export default function Usuarios() {
   const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState<User[]>(mockUsers);
+  const reviveUsers = (data: User[]) => data.map(u => ({ ...u, createdAt: new Date(u.createdAt as any) }));
+  const [users, setUsers] = useState<User[]>(reviveUsers(loadOrInit('usuarios', mockUsers)));
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'gerente' | 'funcionario'>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -58,17 +61,21 @@ export default function Usuarios() {
 
   const watchedRole = watch('role');
 
+  useEffect(() => {
+    storageSet('usuarios', users);
+  }, [users]);
+
   const filteredUsers = users.filter((user) => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (user.phone || '').includes(searchTerm);
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     
-    // Only admin can see all users, gerente can see only their filial
     let hasAccess = true;
-    if (currentUser?.role === 'gerente') {
-      hasAccess = user.filialId === currentUser.filialId || user.role === 'admin';
-    } else if (currentUser?.role === 'funcionario') {
-      hasAccess = user.id === currentUser.id; // Can only see themselves
+    if (currentUser?.role === 'admin') {
+      hasAccess = true;
+    } else {
+      hasAccess = user.filialId === currentUser?.filialId;
     }
     
     return matchesSearch && matchesRole && hasAccess;
@@ -145,9 +152,11 @@ export default function Usuarios() {
               ...u, 
               name: data.name,
               email: data.email,
+              phone: data.phone ?? u.phone ?? '',
               role: data.role,
               filialId: data.filialId,
               isActive: data.isActive,
+              password: data.password ? data.password : u.password,
             }
           : u
       ));
@@ -161,9 +170,11 @@ export default function Usuarios() {
         id: Date.now().toString(),
         name: data.name,
         email: data.email,
+        phone: data.phone || '',
         role: data.role,
         filialId: data.filialId,
         isActive: data.isActive,
+        password: data.password,
         createdAt: new Date(),
       };
       setUsers(prev => [...prev, newUser]);
@@ -208,6 +219,13 @@ export default function Usuarios() {
   const canManageUsers = currentUser?.role === 'admin' || currentUser?.role === 'gerente';
 
   if (!canManageUsers) {
+  const [newPassword, setNewPassword] = useState('');
+  const changeOwnPassword = () => {
+    if (!currentUser || newPassword.length < 6) return;
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, password: newPassword } : u));
+    setNewPassword('');
+    toast({ title: 'Senha atualizada', description: 'Sua senha foi alterada com sucesso.' });
+  };
   return (
     <div className="space-y-6">
       <Breadcrumbs />
@@ -254,6 +272,17 @@ export default function Usuarios() {
             </div>
           </CardContent>
         </Card>
+        <Card className="border-0 shadow-primary max-w-md">
+          <CardHeader>
+            <CardTitle>Alterar Senha</CardTitle>
+            <CardDescription>Atualize sua senha</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Label htmlFor="newPassword">Nova Senha</Label>
+            <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+            <Button onClick={changeOwnPassword} className="gradient-primary">Atualizar Senha</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -271,7 +300,7 @@ export default function Usuarios() {
         <div>
           <h1 className="text-3xl font-bold text-gradient">Gestão de Usuários</h1>
           <p className="text-muted-foreground">
-            Gerencie os usuários do sistema Chitumba
+            Gerencie os usuários do sistema ALF Chitumba
           </p>
         </div>
         {currentUser?.role === 'admin' && (
@@ -323,6 +352,14 @@ export default function Usuarios() {
                     {errors.email && (
                       <p className="text-sm text-destructive">{errors.email.message}</p>
                     )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Telefone</Label>
+                    <Input
+                      id="phone"
+                      placeholder="+244 9xx xxx xxx"
+                      {...register('phone')}
+                    />
                   </div>
                 </div>
 
@@ -461,6 +498,7 @@ export default function Usuarios() {
                       <TableRow>
                         <TableHead>Usuário</TableHead>
                         <TableHead>Email</TableHead>
+                        <TableHead>Telefone</TableHead>
                         <TableHead>Função</TableHead>
                         <TableHead>Filial</TableHead>
                         <TableHead>Status</TableHead>
@@ -486,6 +524,7 @@ export default function Usuarios() {
                             </div>
                           </TableCell>
                           <TableCell>{user.email}</TableCell>
+                          <TableCell>{user.phone || '-'}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               {getRoleIcon(user.role)}

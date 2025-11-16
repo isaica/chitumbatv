@@ -41,17 +41,17 @@ function MensalidadeItem({
           onCheckedChange={() => onToggle(m.id)}
         />
         <div>
-          <p className="font-medium">
-            {getMonthName(m.month)} {m.year}
+          <div className="font-medium flex items-center">
+            <span>{getMonthName(m.month)} {m.year}</span>
             {m.isFuture && (
               <Badge variant="outline" className="ml-2 text-xs border-primary/50 text-primary">
                 Adiantado
               </Badge>
             )}
-          </p>
-          <p className="text-sm text-muted-foreground">
+          </div>
+          <div className="text-sm text-muted-foreground">
             {getMonthType(m)}
-          </p>
+          </div>
         </div>
       </div>
       <div className="text-right">

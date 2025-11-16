@@ -41,35 +41,43 @@ export const mockUsers: User[] = [
     id: '1',
     name: 'Admin Chitumba',
     email: 'admin@chitumba.ao',
+    phone: '+244 900 000 001',
     role: 'admin',
     isActive: true,
+    password: '123456',
     createdAt: new Date('2023-01-01')
   },
   {
     id: '2',
     name: 'João Silva',
     email: 'joao@chitumba.ao',
+    phone: '+244 900 000 002',
     role: 'gerente',
     filialId: '1',
     isActive: true,
+    password: '123456',
     createdAt: new Date('2023-01-15')
   },
   {
     id: '3',
     name: 'Maria Santos',
     email: 'maria@chitumba.ao',
+    phone: '+244 900 000 003',
     role: 'gerente',
     filialId: '2',
     isActive: true,
+    password: '123456',
     createdAt: new Date('2023-02-20')
   },
   {
     id: '4',
     name: 'Carlos Mendes',
     email: 'carlos@chitumba.ao',
+    phone: '+244 900 000 004',
     role: 'funcionario',
     filialId: '3',
     isActive: true,
+    password: '123456',
     createdAt: new Date('2023-03-10')
   }
 ];

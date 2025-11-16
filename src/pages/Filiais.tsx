@@ -149,7 +149,7 @@ export default function Filiais() {
         <div>
           <h1 className="text-3xl font-bold text-gradient">Gestão de Filiais</h1>
           <p className="text-muted-foreground">
-            Gerencie as filiais da Chitumba TV
+            Gerencie as filiais da ALF Chitumba
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -331,7 +331,7 @@ export default function Filiais() {
                     Filiais ({paginationInfo.totalItems})
                   </CardTitle>
                 <CardDescription>
-                  Lista de todas as filiais da Chitumba TV
+                  Lista de todas as filiais da ALF Chitumba
                 </CardDescription>
               </CardHeader>
               <CardContent>
