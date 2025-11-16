@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Search, CheckCircle, Clock, AlertTriangle, Calendar, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,22 +33,23 @@ export default function Mensalidades() {
   
   const userFilialClientIds = userFilialClients.map(c => c.id);
 
-  const filteredMensalidades = mensalidades.filter((mensalidade) => {
-    const client = mockClients.find(c => c.id === mensalidade.clientId);
-    if (!client) return false;
+  const filteredMensalidades = useMemo(() => {
+    return mensalidades.filter((mensalidade) => {
+      const client = mockClients.find(c => c.id === mensalidade.clientId);
+      if (!client) return false;
 
-    // Filter by user access
-    if (!userFilialClientIds.includes(mensalidade.clientId)) return false;
+      if (!userFilialClientIds.includes(mensalidade.clientId)) return false;
 
-    const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         client.phone.includes(searchTerm);
-    const matchesStatus = statusFilter === 'all' || mensalidade.status === statusFilter;
-    const matchesMonth = monthFilter === 'all' || 
-      `${mensalidade.year}-${mensalidade.month.toString().padStart(2, '0')}` === monthFilter;
-    const matchesFilial = filialFilter === 'all' || client.filialId === filialFilter;
-    
-    return matchesSearch && matchesStatus && matchesMonth && matchesFilial;
-  });
+      const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           client.phone.includes(searchTerm);
+      const matchesStatus = statusFilter === 'all' || mensalidade.status === statusFilter;
+      const matchesMonth = monthFilter === 'all' || 
+        `${mensalidade.year}-${mensalidade.month.toString().padStart(2, '0')}` === monthFilter;
+      const matchesFilial = filialFilter === 'all' || client.filialId === filialFilter;
+      
+      return matchesSearch && matchesStatus && matchesMonth && matchesFilial;
+    });
+  }, [mensalidades, searchTerm, statusFilter, monthFilter, filialFilter, userFilialClientIds]);
 
   const getClientName = (clientId: string) => {
     const client = mockClients.find(c => c.id === clientId);
@@ -366,14 +367,24 @@ export default function Mensalidades() {
                         </TableCell>
                         <TableCell className="text-right">
                           {mensalidade.status !== 'pago' && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleMarkAsPaid(mensalidade.id)}
-                              className="gradient-primary"
-                            >
-                              <CheckCircle className="w-4 h-4 mr-2" />
-                              Marcar como Pago
-                            </Button>
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleMarkAsPaid(mensalidade.id)}
+                                className="gradient-primary"
+                              >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Marcar como Pago
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => handleOpenPaymentModal(mensalidade.clientId)}
+                              >
+                                <CreditCard className="w-4 h-4 mr-2" />
+                                Registrar Pagamento
+                              </Button>
+                            </div>
                           )}
                           {mensalidade.status === 'pago' && mensalidade.paidAt && (
                             <div className="text-sm text-muted-foreground">
@@ -391,6 +402,18 @@ export default function Mensalidades() {
             </div>
           )}
         </PaginationWrapper>
+      )}
+      {selectedClientForPayment && (
+        <QuickPaymentModal
+          open={isPaymentModalOpen}
+          onClose={() => {
+            setIsPaymentModalOpen(false);
+            setSelectedClientForPayment(null);
+          }}
+          client={selectedClientForPayment}
+          mensalidades={mensalidades}
+          onPayment={handlePayment}
+        />
       )}
     </div>
   );
