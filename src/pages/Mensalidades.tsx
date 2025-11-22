@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, CheckCircle, Clock, AlertTriangle, Calendar, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,10 @@ import { confirmPayments } from '@/services/payments';
 import { loadOrInit, set as storageSet, get as storageGet } from '@/services/storage';
 import { generateReceipt } from '@/utils/receipt';
 import { VirtualTableBody } from '@/components/ui/virtual-table-body';
-import { useRef } from 'react';
+import { MobileTable, MobileCard, MobileActionMenu, StatusBadge } from '@/components/ui/mobile-table';
+import { useResponsive } from '@/hooks/use-responsive';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 function reviveMensalidades(data: Mensalidade[]): Mensalidade[] {
   return data.map(m => ({
@@ -32,9 +35,11 @@ function reviveMensalidades(data: Mensalidade[]): Mensalidade[] {
 
 export default function Mensalidades() {
   const { user } = useAuth();
+  const { isMobile } = useResponsive();
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const [mensalidades, setMensalidades] = useState<Mensalidade[]>(reviveMensalidades(loadOrInit('mensalidades', mockMensalidades)));
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pago' | 'pendente' | 'atrasado'>('all');
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [filialFilter, setFilialFilter] = useState<string>('all');
@@ -61,8 +66,8 @@ export default function Mensalidades() {
 
       if (!userFilialClientIds.includes(mensalidade.clientId)) return false;
 
-      const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           client.phone.includes(searchTerm);
+      const matchesSearch = client.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                           client.phone.includes(debouncedSearch);
       const matchesStatus = statusFilter === 'all' || mensalidade.status === statusFilter;
       const matchesMonth = monthFilter === 'all' || 
         `${mensalidade.year}-${mensalidade.month.toString().padStart(2, '0')}` === monthFilter;
@@ -70,7 +75,7 @@ export default function Mensalidades() {
       
       return matchesSearch && matchesStatus && matchesMonth && matchesFilial;
     });
-  }, [mensalidades, searchTerm, statusFilter, monthFilter, filialFilter, userFilialClientIds]);
+  }, [mensalidades, debouncedSearch, statusFilter, monthFilter, filialFilter, userFilialClientIds]);
 
   const getClientName = (clientId: string) => {
     const client = mockClients.find(c => c.id === clientId);
@@ -307,105 +312,253 @@ export default function Mensalidades() {
           <NoMensalidades />
         )
       ) : (
-        <PaginationWrapper data={filteredMensalidades} itemsPerPage={15}>
+        <PaginationWrapper data={filteredMensalidades} itemsPerPage={isMobile ? 10 : 15}>
           {(paginatedMensalidades, paginationInfo, paginationElement) => (
             <div className="space-y-4">
-              <Card className="border-0 shadow-primary">
-                <CardHeader>
-                  <CardTitle>
-                    Mensalidades ({paginationInfo.totalItems})
-                  </CardTitle>
-                <CardDescription>
-                  Lista de mensalidades dos clientes
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table className="w-full table-fixed">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[220px]">Cliente</TableHead>
-                      <TableHead className="w-[170px]">Período</TableHead>
-                      <TableHead className="w-[120px]">Valor</TableHead>
-                      {user?.role === 'admin' && <TableHead className="w-[160px]">Filial</TableHead>}
-                      <TableHead className="w-[140px]">Vencimento</TableHead>
-                      <TableHead className="w-[120px]">Status</TableHead>
-                      <TableHead className="w-[220px] text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedMensalidades.map((mensalidade) => (
-                      <TableRow key={mensalidade.id}>
-                        <TableCell>
-                          <div className="font-medium truncate">{getClientName(mensalidade.clientId)}</div>
-                        </TableCell>
-                        <TableCell>
-                          {new Date(mensalidade.year, mensalidade.month - 1).toLocaleDateString('pt-AO', {
-                            month: 'long',
-                            year: 'numeric'
-                          })}
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-medium whitespace-nowrap">{mensalidade.amount.toLocaleString()} AOA</span>
-                        </TableCell>
-                        {user?.role === 'admin' && (
-                          <TableCell className="truncate">{getClientFilial(mensalidade.clientId)}</TableCell>
-                        )}
-                        <TableCell>
-                          <span className="whitespace-nowrap">{mensalidade.dueDate.toLocaleDateString('pt-AO')}</span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getStatusIcon(mensalidade.status)}
-                            <Badge 
-                              variant={
-                                mensalidade.status === 'pago' ? 'default' :
-                                mensalidade.status === 'pendente' ? 'secondary' :
-                                'destructive'
-                              }
-                            >
-                              {mensalidade.status}
-                            </Badge>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {mensalidade.status !== 'pago' && (
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => handleMarkAsPaid(mensalidade.id)}
-                                className="gradient-primary"
-                              >
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Marcar como Pago
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => handleOpenPaymentModal(mensalidade.clientId)}
-                              >
-                                <CreditCard className="w-4 h-4 mr-2" />
-                                Registrar Pagamento
-                              </Button>
-                            </div>
-                          )}
-                          {mensalidade.status === 'pago' && mensalidade.paidAt && (
-                            <div className="flex items-center justify-end gap-2">
-                              <div className="text-sm text-muted-foreground mr-2 whitespace-nowrap">
-                                Pago em {mensalidade.paidAt.toLocaleDateString('pt-AO')}
+              {isMobile ? (
+                // Mobile Version - Card Layout
+                <Card className="border-0 shadow-primary">
+                  <CardHeader>
+                    <CardTitle>
+                      Mensalidades ({paginationInfo.totalItems})
+                    </CardTitle>
+                    <CardDescription>
+                      Lista de mensalidades dos clientes
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <MobileTable
+                      data={paginatedMensalidades}
+                      renderCard={(mensalidade) => {
+                        const clientName = getClientName(mensalidade.clientId);
+                        const filialName = getClientFilial(mensalidade.clientId);
+                        
+                        return (
+                          <MobileCard
+                            key={mensalidade.id}
+                            className="animate-fade-in"
+                            actions={
+                              mensalidade.status !== 'pago' ? (
+                                <MobileActionMenu
+                                  actions={[
+                                    {
+                                      label: 'Marcar como Pago',
+                                      onClick: () => handleMarkAsPaid(mensalidade.id),
+                                    },
+                                    {
+                                      label: 'Registrar Pagamento',
+                                      onClick: () => handleOpenPaymentModal(mensalidade.clientId),
+                                    },
+                                  ]}
+                                />
+                              ) : (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => generateReceipt(mensalidade)}
+                                >
+                                  Recibo
+                                </Button>
+                              )
+                            }
+                          >
+                            <div className="space-y-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="font-semibold text-base truncate">{clientName}</div>
                               </div>
-                              <Button size="sm" variant="outline" onClick={() => generateReceipt(mensalidade)}>
-                                Recibo
-                              </Button>
+                              
+                              <div className="space-y-1 text-sm">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Período:</span>
+                                  <span className="font-medium">
+                                    {new Date(mensalidade.year, mensalidade.month - 1).toLocaleDateString('pt-AO', {
+                                      month: 'short',
+                                      year: 'numeric'
+                                    })}
+                                  </span>
+                                </div>
+                                
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Valor:</span>
+                                  <span className="font-semibold tabular-nums">
+                                    {mensalidade.amount.toLocaleString('pt-AO')} AOA
+                                  </span>
+                                </div>
+                                
+                                {user?.role === 'admin' && (
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground">Filial:</span>
+                                    <span className="font-medium truncate max-w-[150px]">{filialName}</span>
+                                  </div>
+                                )}
+                                
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Vencimento:</span>
+                                  <span>{mensalidade.dueDate.toLocaleDateString('pt-AO')}</span>
+                                </div>
+                                
+                                <div className="flex justify-between items-center pt-1">
+                                  <span className="text-muted-foreground">Status:</span>
+                                  <div className="flex items-center gap-2">
+                                    {getStatusIcon(mensalidade.status)}
+                                    <StatusBadge status={mensalidade.status} />
+                                  </div>
+                                </div>
+                                
+                                {mensalidade.status === 'pago' && mensalidade.paidAt && (
+                                  <div className="flex justify-between items-center text-xs text-muted-foreground pt-1">
+                                    <span>Pago em:</span>
+                                    <span>{mensalidade.paidAt.toLocaleDateString('pt-AO')}</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-            {paginationElement}
+                          </MobileCard>
+                        );
+                      }}
+                      emptyMessage="Nenhuma mensalidade encontrada"
+                    />
+                  </CardContent>
+                </Card>
+              ) : (
+                // Desktop Version - Table with Virtualization
+                <Card className="border-0 shadow-primary">
+                  <CardHeader>
+                    <CardTitle>
+                      Mensalidades ({paginationInfo.totalItems})
+                    </CardTitle>
+                    <CardDescription>
+                      Lista de mensalidades dos clientes
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="w-full overflow-x-auto">
+                      <TooltipProvider>
+                        <div ref={tableScrollRef} className="max-h-[600px] overflow-auto">
+                          <Table className="min-w-[1200px]">
+                            <TableHeader className="sticky top-0 bg-background z-10">
+                              <TableRow>
+                                <TableHead className="min-w-[180px] max-w-[250px]">Cliente</TableHead>
+                                <TableHead className="min-w-[150px]">Período</TableHead>
+                                <TableHead className="min-w-[120px] text-right">Valor</TableHead>
+                                {user?.role === 'admin' && <TableHead className="min-w-[140px]">Filial</TableHead>}
+                                <TableHead className="min-w-[120px]">Vencimento</TableHead>
+                                <TableHead className="min-w-[120px]">Status</TableHead>
+                                <TableHead className="min-w-[280px] text-right">Ações</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <VirtualTableBody
+                              items={paginatedMensalidades}
+                              height={600}
+                              rowHeight={73}
+                              containerRef={tableScrollRef}
+                              renderRow={(mensalidade) => (
+                                <TableRow key={mensalidade.id} className="animate-fade-in">
+                                  <TableCell className="px-4 py-3">
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="font-medium truncate max-w-[220px] cursor-help">
+                                          {getClientName(mensalidade.clientId)}
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        {getClientName(mensalidade.clientId)}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3">
+                                    {new Date(mensalidade.year, mensalidade.month - 1).toLocaleDateString('pt-AO', {
+                                      month: 'long',
+                                      year: 'numeric'
+                                    })}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-right tabular-nums">
+                                    <span className="font-medium whitespace-nowrap">
+                                      {mensalidade.amount.toLocaleString('pt-AO')} AOA
+                                    </span>
+                                  </TableCell>
+                                  {user?.role === 'admin' && (
+                                    <TableCell className="px-4 py-3">
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <div className="truncate max-w-[130px] cursor-help">
+                                            {getClientFilial(mensalidade.clientId)}
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          {getClientFilial(mensalidade.clientId)}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TableCell>
+                                  )}
+                                  <TableCell className="px-4 py-3">
+                                    <span className="whitespace-nowrap">
+                                      {mensalidade.dueDate.toLocaleDateString('pt-AO')}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      {getStatusIcon(mensalidade.status)}
+                                      <Badge 
+                                        variant={
+                                          mensalidade.status === 'pago' ? 'default' :
+                                          mensalidade.status === 'pendente' ? 'secondary' :
+                                          'destructive'
+                                        }
+                                      >
+                                        {mensalidade.status}
+                                      </Badge>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-right">
+                                    {mensalidade.status !== 'pago' && (
+                                      <div className="flex justify-end gap-2">
+                                        <Button
+                                          size="sm"
+                                          onClick={() => handleMarkAsPaid(mensalidade.id)}
+                                          className="gradient-primary transition-all hover:scale-105"
+                                        >
+                                          <CheckCircle className="w-4 h-4 mr-2" />
+                                          Marcar como Pago
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="secondary"
+                                          onClick={() => handleOpenPaymentModal(mensalidade.clientId)}
+                                          className="transition-all hover:scale-105"
+                                        >
+                                          <CreditCard className="w-4 h-4 mr-2" />
+                                          Registrar
+                                        </Button>
+                                      </div>
+                                    )}
+                                    {mensalidade.status === 'pago' && mensalidade.paidAt && (
+                                      <div className="flex items-center justify-end gap-2">
+                                        <div className="text-sm text-muted-foreground mr-2 whitespace-nowrap">
+                                          Pago em {mensalidade.paidAt.toLocaleDateString('pt-AO')}
+                                        </div>
+                                        <Button 
+                                          size="sm" 
+                                          variant="outline" 
+                                          onClick={() => generateReceipt(mensalidade)}
+                                          className="transition-all hover:scale-105"
+                                        >
+                                          Recibo
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            />
+                          </Table>
+                        </div>
+                      </TooltipProvider>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              {paginationElement}
             </div>
           )}
         </PaginationWrapper>

@@ -23,7 +23,7 @@ export function confirmPayments(
       month,
       year,
       amount: filial?.monthlyPrice || 0,
-      status: 'pago',
+      status: 'pago' as const,
       dueDate: new Date(year, month - 1, 15),
       paidAt: now,
       createdAt: now,
@@ -31,7 +31,7 @@ export function confirmPayments(
   });
 
   const updated = mensalidades.map(m => (
-    existingIds.includes(m.id) ? { ...m, status: 'pago', paidAt: now } : m
+    existingIds.includes(m.id) ? { ...m, status: 'pago' as const, paidAt: now } : m
   ));
 
   return [...updated, ...newMensalidades];
