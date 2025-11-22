@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, CheckCircle, Clock, AlertTriangle, Calendar, CreditCard } from 'lucide-react';
+import { Search, Clock, AlertTriangle, Calendar, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +23,7 @@ import { MobileTable, MobileCard, MobileActionMenu, StatusBadge } from '@/compon
 import { useResponsive } from '@/hooks/use-responsive';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { FilterBar, MultiSelectFilter, DateRangeFilter } from '@/components/ui/advanced-filters';
 
 function reviveMensalidades(data: Mensalidade[]): Mensalidade[] {
   return data.map(m => ({
@@ -43,6 +44,9 @@ export default function Mensalidades() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pago' | 'pendente' | 'atrasado'>('all');
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [filialFilter, setFilialFilter] = useState<string>('all');
+  const [selectedFiliais, setSelectedFiliais] = useState<string[]>([]);
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
   const [isClientPickerOpen, setIsClientPickerOpen] = useState(false);
@@ -73,9 +77,20 @@ export default function Mensalidades() {
         `${mensalidade.year}-${mensalidade.month.toString().padStart(2, '0')}` === monthFilter;
       const matchesFilial = filialFilter === 'all' || client.filialId === filialFilter;
       
-      return matchesSearch && matchesStatus && matchesMonth && matchesFilial;
+      // Advanced filters
+      const matchesFiliais = selectedFiliais.length === 0 || selectedFiliais.includes(client.filialId);
+      
+      const matchesDateRange = (() => {
+        if (!startDate && !endDate) return true;
+        const mensalidadeDate = new Date(mensalidade.year, mensalidade.month - 1, 1);
+        if (startDate && mensalidadeDate < startDate) return false;
+        if (endDate && mensalidadeDate > endDate) return false;
+        return true;
+      })();
+      
+      return matchesSearch && matchesStatus && matchesMonth && matchesFilial && matchesFiliais && matchesDateRange;
     });
-  }, [mensalidades, debouncedSearch, statusFilter, monthFilter, filialFilter, userFilialClientIds]);
+  }, [mensalidades, debouncedSearch, statusFilter, monthFilter, filialFilter, selectedFiliais, startDate, endDate, userFilialClientIds]);
 
   const getClientName = (clientId: string) => {
     const client = mockClients.find(c => c.id === clientId);
@@ -88,6 +103,30 @@ export default function Mensalidades() {
     const filial = mockFiliais.find(f => f.id === client.filialId);
     return filial?.name || 'N/A';
   };
+
+  // Count active filters for advanced filters
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (selectedFiliais.length > 0) count++;
+    if (startDate || endDate) count++;
+    return count;
+  }, [selectedFiliais, startDate, endDate]);
+
+  const clearAllAdvancedFilters = () => {
+    setSelectedFiliais([]);
+    setStartDate(undefined);
+    setEndDate(undefined);
+  };
+
+  // Filial options for multi-select
+  const filialOptions = mockFiliais.map(filial => ({
+    value: filial.id,
+    label: filial.name,
+    count: mensalidades.filter(m => {
+      const client = mockClients.find(c => c.id === m.clientId);
+      return client?.filialId === filial.id;
+    }).length
+  }));
 
   const handleMarkAsPaid = (mensalidadeId: string) => {
     const target = mensalidades.find(m => m.id === mensalidadeId);
@@ -136,8 +175,6 @@ export default function Mensalidades() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pago':
-        return <CheckCircle className="w-4 h-4 text-success" />;
       case 'pendente':
         return <Clock className="w-4 h-4 text-warning" />;
       case 'atrasado':
@@ -208,7 +245,7 @@ export default function Mensalidades() {
         <Card className="gradient-card border-0 shadow-primary">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pagas</CardTitle>
-            <CheckCircle className="w-4 h-4 text-success" />
+            <CreditCard className="w-4 h-4 text-success" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">
@@ -251,55 +288,82 @@ export default function Mensalidades() {
           <CardTitle className="text-lg">Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Buscar por cliente..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="pago">Pago</SelectItem>
-                <SelectItem value="pendente">Pendente</SelectItem>
-                <SelectItem value="atrasado">Atrasado</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={monthFilter} onValueChange={setMonthFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Mês/Ano" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Meses</SelectItem>
-                {generateMonthOptions().map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {user?.role === 'admin' && (
-              <Select value={filialFilter} onValueChange={setFilialFilter}>
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Buscar por cliente..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Filial" />
+                  <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas as Filiais</SelectItem>
-                  {mockFiliais.map((filial) => (
-                    <SelectItem key={filial.id} value={filial.id}>
-                      {filial.name}
+                  <SelectItem value="all">Todos os Status</SelectItem>
+                  <SelectItem value="pago">Pago</SelectItem>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="atrasado">Atrasado</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={monthFilter} onValueChange={setMonthFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Mês/Ano" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Meses</SelectItem>
+                  {generateMonthOptions().map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            )}
+              {user?.role === 'admin' && (
+                <Select value={filialFilter} onValueChange={setFilialFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filial" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Filiais</SelectItem>
+                    {mockFiliais.map((filial) => (
+                      <SelectItem key={filial.id} value={filial.id}>
+                        {filial.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Advanced Filters */}
+            <FilterBar 
+              activeFiltersCount={activeFiltersCount}
+              onClearAll={clearAllAdvancedFilters}
+            >
+              <MultiSelectFilter
+                title="Filiais"
+                options={filialOptions}
+                selectedValues={selectedFiliais}
+                onSelectionChange={setSelectedFiliais}
+                placeholder="Selecionar filiais"
+                showCounts={true}
+              />
+              
+              <DateRangeFilter
+                startDate={startDate}
+                endDate={endDate}
+                onDateChange={(start, end) => {
+                  setStartDate(start);
+                  setEndDate(end);
+                }}
+                placeholder="Selecionar período"
+              />
+            </FilterBar>
           </div>
         </CardContent>
       </Card>
@@ -339,23 +403,21 @@ export default function Mensalidades() {
                             className="animate-fade-in"
                             actions={
                               mensalidade.status !== 'pago' ? (
-                                <MobileActionMenu
-                                  actions={[
-                                    {
-                                      label: 'Marcar como Pago',
-                                      onClick: () => handleMarkAsPaid(mensalidade.id),
-                                    },
-                                    {
-                                      label: 'Registrar Pagamento',
-                                      onClick: () => handleOpenPaymentModal(mensalidade.clientId),
-                                    },
-                                  ]}
-                                />
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => handleOpenPaymentModal(mensalidade.clientId)}
+                                  className="w-full"
+                                >
+                                  <CreditCard className="w-4 h-4 mr-2" />
+                                  Registrar Pagamento
+                                </Button>
                               ) : (
                                 <Button 
                                   size="sm" 
                                   variant="outline" 
                                   onClick={() => generateReceipt(mensalidade)}
+                                  className="w-full"
                                 >
                                   Recibo
                                 </Button>
@@ -512,25 +574,15 @@ export default function Mensalidades() {
                                   </TableCell>
                                   <TableCell className="px-4 py-3 text-right">
                                     {mensalidade.status !== 'pago' && (
-                                      <div className="flex justify-end gap-2">
-                                        <Button
-                                          size="sm"
-                                          onClick={() => handleMarkAsPaid(mensalidade.id)}
-                                          className="gradient-primary transition-all hover:scale-105"
-                                        >
-                                          <CheckCircle className="w-4 h-4 mr-2" />
-                                          Marcar como Pago
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          variant="secondary"
-                                          onClick={() => handleOpenPaymentModal(mensalidade.clientId)}
-                                          className="transition-all hover:scale-105"
-                                        >
-                                          <CreditCard className="w-4 h-4 mr-2" />
-                                          Registrar
-                                        </Button>
-                                      </div>
+                                      <Button
+                                        size="sm"
+                                        variant="secondary"
+                                        onClick={() => handleOpenPaymentModal(mensalidade.clientId)}
+                                        className="transition-all hover:scale-105"
+                                      >
+                                        <CreditCard className="w-4 h-4 mr-2" />
+                                        Registrar Pagamento
+                                      </Button>
                                     )}
                                     {mensalidade.status === 'pago' && mensalidade.paidAt && (
                                       <div className="flex items-center justify-end gap-2">
