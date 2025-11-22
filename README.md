@@ -1,4 +1,4 @@
-# Welcome to your Lovable project Chitumba
+# Welcome to myLovable project Chitumba
 
 ## Project info
 
