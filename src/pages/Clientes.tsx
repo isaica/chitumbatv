@@ -73,7 +73,6 @@ export default function Clientes() {
   const [paymentClient, setPaymentClient] = useState<Client | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
-  const [quickFilter, setQuickFilter] = useState<'all' | 'kilapeiro' | 'em_dia'>('all');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -125,17 +124,10 @@ export default function Clientes() {
                         (debtFilter === 'no_debt' && client.paymentStatus.totalDebt === 0) ||
                         (debtFilter === 'with_debt' && client.paymentStatus.totalDebt > 0);
     
-    let matchesQuickFilter = true;
-    if (quickFilter === 'kilapeiro') {
-      matchesQuickFilter = client.paymentStatus.status === 'kilapeiro';
-    } else if (quickFilter === 'em_dia') {
-      matchesQuickFilter = client.paymentStatus.status === 'pago';
-    }
-    
     const hasAccess = user?.role === 'admin' || client.filialId === user?.filialId;
     
-    return matchesSearch && matchesStatus && matchesFilial && matchesDebt && matchesQuickFilter && hasAccess;
-  }), [clientsWithPaymentStatus, searchTerm, statusFilter, filialFilter, debtFilter, quickFilter, user]);
+    return matchesSearch && matchesStatus && matchesFilial && matchesDebt && hasAccess;
+  }), [clientsWithPaymentStatus, searchTerm, statusFilter, filialFilter, debtFilter, user]);
 
   const getFilialName = (filialId: string) => {
     return mockFiliais.find(f => f.id === filialId)?.name || 'N/A';
@@ -301,7 +293,7 @@ export default function Clientes() {
     setSelectedClients([]);
   };
 
-  // Calculate quick filter counts
+  // Calculate status counts
   const kilapeiroCount = clientsWithPaymentStatus.filter(c => c.paymentStatus.status === 'kilapeiro').length;
   const paidCount = clientsWithPaymentStatus.filter(c => c.paymentStatus.status === 'pago').length;
   const inativoCount = clientsWithPaymentStatus.filter(c => c.paymentStatus.status === 'inativo').length;
@@ -513,31 +505,6 @@ export default function Clientes() {
           <CardTitle className="text-lg">Filtros</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Quick Filters */}
-          <div className="flex flex-wrap gap-2">
-            <Badge 
-              variant={quickFilter === 'all' ? 'default' : 'outline'}
-              className="cursor-pointer px-4 py-2 text-sm hover:bg-primary/90 transition-colors"
-              onClick={() => setQuickFilter('all')}
-            >
-              Todos ({clientsWithPaymentStatus.length})
-            </Badge>
-            <Badge 
-              variant={quickFilter === 'kilapeiro' ? 'destructive' : 'outline'}
-              className="cursor-pointer px-4 py-2 text-sm hover:bg-destructive/90 transition-colors"
-              onClick={() => setQuickFilter('kilapeiro')}
-            >
-              🔴 Kilapeiros ({kilapeiroCount})
-            </Badge>
-            <Badge 
-              variant={quickFilter === 'em_dia' ? 'default' : 'outline'}
-              className="cursor-pointer px-4 py-2 text-sm bg-success hover:bg-success/90 text-white border-success"
-              onClick={() => setQuickFilter('em_dia')}
-            >
-              🟢 Em Dia ({paidCount})
-            </Badge>
-          </div>
-
           {/* Search and Filters */}
           <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <div className="relative">
@@ -555,7 +522,7 @@ export default function Clientes() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="pago">Em Dia</SelectItem>
+                <SelectItem value="pago">Pago</SelectItem>
                 <SelectItem value="kilapeiro">Kilapeiro</SelectItem>
                 <SelectItem value="inativo">Inativo</SelectItem>
               </SelectContent>

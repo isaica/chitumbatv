@@ -144,11 +144,12 @@ function MetricCard({ title, value, description, icon: Icon, trend, trendValue, 
 export default function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { addNotification } = useNotifications();
+  const navigate = useNavigate();
   const [mensalidades, setMensalidades] = useState<Mensalidade[]>(mockMensalidades);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
-  const { addNotification } = useNotifications();
-  const navigate = useNavigate();
+  const currentMonth = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
 
   const handlePayment = (mensalidadeIds: string[]) => {
     // Separate existing IDs from virtual/future ones
@@ -157,7 +158,6 @@ export default function Dashboard() {
     
     // Create new mensalidades for virtual/future months
     const newMensalidades: Mensalidade[] = virtualIds.map(id => {
-      // Extract info from ID: virtual-{clientId}-{year}-{month}
       const parts = id.split('-');
       const clientId = parts.slice(1, -2).join('-');
       const year = parseInt(parts[parts.length - 2]);
@@ -193,10 +193,10 @@ export default function Dashboard() {
       title: 'Pagamento registrado',
       description: `${mensalidadeIds.length} ${mensalidadeIds.length === 1 ? 'mensalidade paga' : 'mensalidades pagas'} com sucesso.`,
     });
-
     setIsPaymentModalOpen(false);
     setSelectedClientForPayment(null);
   };
+  
   const metrics = mockDashboardMetrics;
 
   // Filter data based on user role and filial
