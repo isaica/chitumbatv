@@ -36,7 +36,7 @@ export interface Client {
   };
   document: string;
   filialId: string;
-  status: 'ativo' | 'inativo' | 'suspenso';
+  status: 'ativo' | 'inativo';
   createdAt: Date;
 }
 

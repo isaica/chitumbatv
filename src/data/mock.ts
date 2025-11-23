@@ -144,7 +144,7 @@ export const mockClients: Client[] = [
     },
     document: '007890124LA048',
     filialId: '3',
-    status: 'suspenso',
+    status: 'inativo',
     createdAt: new Date('2023-09-05')
   },
   {

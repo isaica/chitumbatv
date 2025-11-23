@@ -75,13 +75,11 @@ export default function Relatorios() {
     const statusCounts = {
       ativo: filteredClients.filter(c => c.status === 'ativo').length,
       inativo: filteredClients.filter(c => c.status === 'inativo').length,
-      suspenso: filteredClients.filter(c => c.status === 'suspenso').length,
     };
 
     return [
       { name: 'Ativos', value: statusCounts.ativo, color: 'hsl(var(--primary))' },
       { name: 'Inativos', value: statusCounts.inativo, color: 'hsl(var(--muted))' },
-      { name: 'Suspensos', value: statusCounts.suspenso, color: 'hsl(var(--destructive))' },
     ];
   };
 

@@ -43,7 +43,7 @@ export function GlobalSearch() {
     const overdue = clientMensalidades.filter(m => m.status === 'atrasado').length;
     const client = mockClients.find(c => c.id === clientId);
     
-    if (client?.status === 'suspenso') return '🔴 Suspenso';
+    if (client?.status === 'inativo') return '🔴 Inativo';
     if (overdue >= 3) return '🔴 Crítico';
     if (overdue >= 1) return '⚠️ Atrasado';
     return '✅ Em dia';
@@ -69,7 +69,7 @@ export function GlobalSearch() {
         client.document.includes(query);
 
       const matchesStatus = isPaymentSearch && (
-        (query.includes('suspenso') && client.status === 'suspenso') ||
+        (query.includes('inativo') && client.status === 'inativo') ||
         (query.includes('critico') && paymentStatus.includes('Crítico')) ||
         (query.includes('atraso') && paymentStatus.includes('Atrasado'))
       );
