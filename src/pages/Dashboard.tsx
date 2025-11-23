@@ -41,7 +41,6 @@ const revenueData = [
 const statusDistribution = [
   { name: 'Ativos', value: 234, color: 'hsl(var(--primary))' },
   { name: 'Inativos', value: 45, color: 'hsl(var(--muted))' },
-  { name: 'Suspensos', value: 12, color: 'hsl(var(--destructive))' },
 ];
 
 const growthData = [
@@ -217,7 +216,7 @@ export default function Dashboard() {
       return { client, paymentStatus };
     })
     .filter(({ paymentStatus }) => 
-      paymentStatus.status === 'suspenso' || paymentStatus.overdueCount >= 2
+      paymentStatus.status === 'kilapeiro' && paymentStatus.overdueCount >= 2
     )
     .sort((a, b) => b.paymentStatus.overdueCount - a.paymentStatus.overdueCount)
     .slice(0, 5);
@@ -225,7 +224,7 @@ export default function Dashboard() {
   const totalOverdueClients = userFilialClients.filter(client => {
     const clientMensalidades = mockMensalidades.filter(m => m.clientId === client.id);
     const status = calculateClientPaymentStatus(client, clientMensalidades);
-    return status.status === 'inadimplente' || status.status === 'suspenso';
+    return status.status === 'kilapeiro';
   }).length;
 
   const recentActivities = mockActivities.slice(0, 5);
@@ -309,10 +308,10 @@ export default function Dashboard() {
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{client.name}</p>
                         <Badge 
-                          variant={paymentStatus.status === 'suspenso' ? 'destructive' : 'secondary'}
+                          variant="destructive"
                           className="text-xs"
                         >
-                          {paymentStatus.status === 'suspenso' ? 'Suspenso' : `${paymentStatus.overdueCount} meses`}
+                          {paymentStatus.overdueCount} meses
                         </Badge>
                       </div>
                       <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">

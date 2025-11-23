@@ -42,7 +42,7 @@ const clientSchema = z.object({
   province: z.string().min(1, 'Província é obrigatória'),
   document: z.string().min(1, 'Documento é obrigatório'),
   filialId: z.string().min(1, 'Filial é obrigatória'),
-  status: z.enum(['ativo', 'inativo', 'suspenso']),
+  status: z.enum(['ativo', 'inativo']),
 });
 
 type ClientFormData = z.infer<typeof clientSchema>;
@@ -63,7 +63,7 @@ export default function Clientes() {
   const [clients, setClients] = useState<Client[]>(loadOrInit('clients', mockClients).map(c => ({ ...c, createdAt: new Date(c.createdAt as any) })));
   const [mensalidades, setMensalidades] = useState<Mensalidade[]>(reviveMensalidades(loadOrInit('mensalidades', mockMensalidades)));
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pago' | 'atrasado' | 'inadimplente' | 'suspenso' | 'inativo'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pago' | 'kilapeiro' | 'inativo'>('all');
   const [filialFilter, setFilialFilter] = useState<string>('all');
   const [debtFilter, setDebtFilter] = useState<'all' | 'no_debt' | 'with_debt'>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -73,7 +73,7 @@ export default function Clientes() {
   const [paymentClient, setPaymentClient] = useState<Client | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
-  const [quickFilter, setQuickFilter] = useState<'all' | 'suspenso' | 'critico' | 'atrasado' | 'em_dia'>('all');
+  const [quickFilter, setQuickFilter] = useState<'all' | 'kilapeiro' | 'em_dia'>('all');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -126,12 +126,8 @@ export default function Clientes() {
                         (debtFilter === 'with_debt' && client.paymentStatus.totalDebt > 0);
     
     let matchesQuickFilter = true;
-    if (quickFilter === 'suspenso') {
-      matchesQuickFilter = client.paymentStatus.status === 'suspenso';
-    } else if (quickFilter === 'critico') {
-      matchesQuickFilter = client.paymentStatus.overdueCount >= 2 && client.paymentStatus.status !== 'suspenso';
-    } else if (quickFilter === 'atrasado') {
-      matchesQuickFilter = (client.paymentStatus.status === 'inadimplente' || client.paymentStatus.overdueCount === 1) && client.paymentStatus.status !== 'suspenso';
+    if (quickFilter === 'kilapeiro') {
+      matchesQuickFilter = client.paymentStatus.status === 'kilapeiro';
     } else if (quickFilter === 'em_dia') {
       matchesQuickFilter = client.paymentStatus.status === 'pago';
     }
@@ -306,14 +302,9 @@ export default function Clientes() {
   };
 
   // Calculate quick filter counts
-  const suspendedCount = clientsWithPaymentStatus.filter(c => c.paymentStatus.status === 'suspenso').length;
-  const criticalCount = clientsWithPaymentStatus.filter(c => {
-    return c.paymentStatus.overdueCount >= 2 && c.paymentStatus.status !== 'suspenso';
-  }).length;
-  const overdueCount = clientsWithPaymentStatus.filter(c => {
-    return (c.paymentStatus.status === 'inadimplente' || c.paymentStatus.overdueCount === 1) && c.paymentStatus.status !== 'suspenso';
-  }).length;
+  const kilapeiroCount = clientsWithPaymentStatus.filter(c => c.paymentStatus.status === 'kilapeiro').length;
   const paidCount = clientsWithPaymentStatus.filter(c => c.paymentStatus.status === 'pago').length;
+  const inativoCount = clientsWithPaymentStatus.filter(c => c.paymentStatus.status === 'inativo').length;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-AO', {
@@ -489,14 +480,15 @@ export default function Clientes() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="status">Status</Label>
-                  <Select onValueChange={(value: 'ativo' | 'inativo' | 'suspenso') => setValue('status', value)}>
+                  <Select onValueChange={(value: 'ativo' | 'inativo') => setValue('status', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ativo">Ativo</SelectItem>
-                      <SelectItem value="inativo">Inativo</SelectItem>
-                      <SelectItem value="suspenso">Suspenso</SelectItem>
+                <SelectItem value="ativo">Ativo</SelectItem>
+                      {user?.role === 'admin' && (
+                        <SelectItem value="inativo">Inativo</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -531,25 +523,11 @@ export default function Clientes() {
               Todos ({clientsWithPaymentStatus.length})
             </Badge>
             <Badge 
-              variant={quickFilter === 'suspenso' ? 'destructive' : 'outline'}
+              variant={quickFilter === 'kilapeiro' ? 'destructive' : 'outline'}
               className="cursor-pointer px-4 py-2 text-sm hover:bg-destructive/90 transition-colors"
-              onClick={() => setQuickFilter('suspenso')}
+              onClick={() => setQuickFilter('kilapeiro')}
             >
-              🔴 Suspensos ({suspendedCount})
-            </Badge>
-            <Badge 
-              variant={quickFilter === 'critico' ? 'default' : 'outline'}
-              className="cursor-pointer px-4 py-2 text-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-              onClick={() => setQuickFilter('critico')}
-            >
-              🟠 Críticos ({criticalCount})
-            </Badge>
-            <Badge 
-              variant={quickFilter === 'atrasado' ? 'default' : 'outline'}
-              className="cursor-pointer px-4 py-2 text-sm bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500"
-              onClick={() => setQuickFilter('atrasado')}
-            >
-              🟡 Atrasados ({overdueCount})
+              🔴 Kilapeiros ({kilapeiroCount})
             </Badge>
             <Badge 
               variant={quickFilter === 'em_dia' ? 'default' : 'outline'}
@@ -578,9 +556,7 @@ export default function Clientes() {
               <SelectContent>
                 <SelectItem value="all">Todos os Status</SelectItem>
                 <SelectItem value="pago">Em Dia</SelectItem>
-                <SelectItem value="atrasado">Atrasado</SelectItem>
-                <SelectItem value="inadimplente">Kilapeiro</SelectItem>
-                <SelectItem value="suspenso">Suspenso</SelectItem>
+                <SelectItem value="kilapeiro">Kilapeiro</SelectItem>
                 <SelectItem value="inativo">Inativo</SelectItem>
               </SelectContent>
             </Select>
@@ -770,7 +746,7 @@ export default function Clientes() {
                           <TableRow 
                             key={client.id} 
                             className={`hover:bg-muted/50 transition-colors ${
-                              client.paymentStatus.status === 'suspenso' ? 'critical-row' :
+                              client.paymentStatus.status === 'kilapeiro' && client.paymentStatus.overdueCount >= 3 ? 'critical-row' :
                               client.paymentStatus.overdueCount >= 2 ? 'warning-row' : ''
                             }`}
                           >

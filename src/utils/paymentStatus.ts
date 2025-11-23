@@ -1,7 +1,7 @@
 import { Client, Mensalidade } from '@/types';
 
 export interface ClientPaymentStatus {
-  status: 'pago' | 'atrasado' | 'inadimplente' | 'suspenso' | 'inativo';
+  status: 'pago' | 'kilapeiro' | 'inativo';
   overdueMonths: string[];
   totalDebt: number;
   currentMonthPaid: boolean;
@@ -12,7 +12,7 @@ export function calculateClientPaymentStatus(
   client: Client, 
   mensalidades: Mensalidade[]
 ): ClientPaymentStatus {
-  // Se cliente está inativo, retorna status direto
+  // 1. Se cliente está inativo (só Admin pode fazer isso)
   if (client.status === 'inativo') {
     return {
       status: 'inativo',
@@ -46,19 +46,8 @@ export function calculateClientPaymentStatus(
   const totalDebt = overdueMensalidades.reduce((total, m) => total + m.amount, 0);
   const overdueCount = overdueMensalidades.length;
 
-  // REGRA DE NEGÓCIO: Suspensão automática após 3+ meses em atraso
-  if (overdueCount >= 3) {
-    return {
-      status: 'suspenso',
-      overdueMonths,
-      totalDebt,
-      currentMonthPaid,
-      overdueCount
-    };
-  }
-
-  // Se cliente foi manualmente suspenso mas tem pagamento em dia, reativa automaticamente
-  if (client.status === 'suspenso' && overdueCount === 0 && currentMonthPaid) {
+  // 2. LÓGICA SIMPLIFICADA: Pago ou Kilapeiro
+  if (currentMonthPaid && overdueCount === 0) {
     return {
       status: 'pago',
       overdueMonths: [],
@@ -66,37 +55,15 @@ export function calculateClientPaymentStatus(
       currentMonthPaid: true,
       overdueCount: 0
     };
-  }
-
-  // Se cliente foi manualmente suspenso e ainda tem dívidas, mantém suspenso
-  if (client.status === 'suspenso') {
+  } else {
     return {
-      status: 'suspenso',
+      status: 'kilapeiro',
       overdueMonths,
       totalDebt,
       currentMonthPaid,
       overdueCount
     };
   }
-
-  // Determina o status baseado na situação de pagamento
-  let status: ClientPaymentStatus['status'];
-  
-  if (!currentMonthPaid) {
-    status = 'inadimplente';
-  } else if (overdueCount > 0) {
-    status = 'atrasado';
-  } else {
-    status = 'pago';
-  }
-
-  return {
-    status,
-    overdueMonths,
-    totalDebt,
-    currentMonthPaid,
-    overdueCount
-  };
 }
 
 function getMonthName(month: number): string {
@@ -111,11 +78,8 @@ export function getStatusColor(status: ClientPaymentStatus['status']): string {
   switch (status) {
     case 'pago':
       return 'text-green-600 bg-green-50 border-green-200';
-    case 'atrasado':
-      return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-    case 'inadimplente':
+    case 'kilapeiro':
       return 'text-red-600 bg-red-50 border-red-200';
-    case 'suspenso':
     case 'inativo':
       return 'text-gray-600 bg-gray-50 border-gray-200';
     default:
@@ -127,12 +91,8 @@ export function getStatusLabel(status: ClientPaymentStatus['status']): string {
   switch (status) {
     case 'pago':
       return 'Em Dia';
-    case 'atrasado':
-      return 'Atrasado';
-    case 'inadimplente':
+    case 'kilapeiro':
       return 'Kilapeiro';
-    case 'suspenso':
-      return 'Suspenso';
     case 'inativo':
       return 'Inativo';
     default:

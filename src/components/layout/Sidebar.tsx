@@ -55,13 +55,6 @@ const menuItems = [
     badge: true
   },
   {
-    title: 'Mensalidades',
-    url: '/mensalidades',
-    icon: CreditCard,
-    roles: ['admin', 'gerente', 'funcionario'],
-    badge: true
-  },
-  {
     title: 'Usuários',
     url: '/usuarios',
     icon: UserCog,
@@ -87,22 +80,15 @@ export function AppSidebar() {
     ? mockClients 
     : mockClients.filter(c => c.filialId === user?.filialId);
 
-  // Count clients with payment issues
+  // Count clients with payment issues (Kilapeiros)
   const clientsWithIssues = userFilialClients.filter(client => {
     const clientMensalidades = mockMensalidades.filter(m => m.clientId === client.id);
     const status = calculateClientPaymentStatus(client, clientMensalidades);
-    return status.status === 'inadimplente' || status.status === 'suspenso';
-  }).length;
-
-  // Count overdue mensalidades
-  const overdueMensalidades = mockMensalidades.filter(m => {
-    const client = userFilialClients.find(c => c.id === m.clientId);
-    return client && m.status === 'atrasado';
+    return status.status === 'kilapeiro';
   }).length;
 
   const getBadgeCount = (title: string) => {
     if (title === 'Clientes') return clientsWithIssues;
-    if (title === 'Mensalidades') return overdueMensalidades;
     return 0;
   };
 

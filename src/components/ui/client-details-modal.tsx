@@ -76,13 +76,12 @@ export function ClientDetailsModal({
 
   // Determine recommended actions
   const getRecommendedActions = () => {
-    if (paymentStatus.status === 'suspenso') {
+    if (paymentStatus.status === 'inativo') {
       return [
-        { label: 'Negociar Dívida', variant: 'default' as const },
         { label: 'Reativar Cliente', variant: 'secondary' as const }
       ];
     }
-    if (paymentStatus.status === 'inadimplente' || paymentStatus.totalDebt > 0) {
+    if (paymentStatus.status === 'kilapeiro' || paymentStatus.totalDebt > 0) {
       return [
         { label: 'Enviar Lembrete', variant: 'default' as const },
         { label: 'Registrar Pagamento', variant: 'secondary' as const }
@@ -153,7 +152,7 @@ export function ClientDetailsModal({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {paymentStatus.status === 'inadimplente' && (
+              {paymentStatus.status === 'kilapeiro' && !paymentStatus.currentMonthPaid && (
                 <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <AlertCircle className="w-5 h-5 text-red-600" />
                   <span className="text-red-700 font-medium">Cliente não pagou o mês atual</span>
