@@ -90,7 +90,7 @@ export function getStatusColor(status: ClientPaymentStatus['status']): string {
 export function getStatusLabel(status: ClientPaymentStatus['status']): string {
   switch (status) {
     case 'pago':
-      return 'Em Dia';
+      return 'Pago';
     case 'kilapeiro':
       return 'Kilapeiro';
     case 'inativo':
