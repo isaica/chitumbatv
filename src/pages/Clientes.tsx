@@ -65,7 +65,6 @@ export default function Clientes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pago' | 'kilapeiro' | 'inativo'>('all');
   const [filialFilter, setFilialFilter] = useState<string>('all');
-  const [debtFilter, setDebtFilter] = useState<'all' | 'no_debt' | 'with_debt'>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [detailsClient, setDetailsClient] = useState<Client | null>(null);
@@ -120,14 +119,10 @@ export default function Clientes() {
     
     const matchesFilial = filialFilter === 'all' || client.filialId === filialFilter;
     
-    const matchesDebt = debtFilter === 'all' || 
-                        (debtFilter === 'no_debt' && client.paymentStatus.totalDebt === 0) ||
-                        (debtFilter === 'with_debt' && client.paymentStatus.totalDebt > 0);
-    
     const hasAccess = user?.role === 'admin' || client.filialId === user?.filialId;
     
-    return matchesSearch && matchesStatus && matchesFilial && matchesDebt && hasAccess;
-  }), [clientsWithPaymentStatus, searchTerm, statusFilter, filialFilter, debtFilter, user]);
+    return matchesSearch && matchesStatus && matchesFilial && hasAccess;
+  }), [clientsWithPaymentStatus, searchTerm, statusFilter, filialFilter, user]);
 
   const getFilialName = (filialId: string) => {
     return mockFiliais.find(f => f.id === filialId)?.name || 'N/A';
@@ -228,7 +223,6 @@ export default function Clientes() {
     setSearchTerm('');
     setStatusFilter('all');
     setFilialFilter('all');
-    setDebtFilter('all');
   };
 
   const handleViewDetails = (client: Client) => {
@@ -527,16 +521,6 @@ export default function Clientes() {
                 <SelectItem value="inativo">Inativo</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={debtFilter} onValueChange={(value: any) => setDebtFilter(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Situação de Dívida" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as Situações</SelectItem>
-                <SelectItem value="no_debt">Sem Dívidas</SelectItem>
-                <SelectItem value="with_debt">Com Dívidas</SelectItem>
-              </SelectContent>
-            </Select>
             {user?.role === 'admin' && (
               <Select value={filialFilter} onValueChange={setFilialFilter}>
                 <SelectTrigger>
@@ -585,7 +569,7 @@ export default function Clientes() {
 
       {/* Results */}
       {filteredClients.length === 0 ? (
-        searchTerm || statusFilter !== 'all' || filialFilter !== 'all' || debtFilter !== 'all' ? (
+        searchTerm || statusFilter !== 'all' || filialFilter !== 'all' ? (
           <NoSearchResults searchTerm={searchTerm} onClear={clearSearch} />
         ) : (
           <NoClients onCreate={() => handleOpenDialog()} />
