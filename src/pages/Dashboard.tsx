@@ -18,6 +18,9 @@ import { useNavigate } from 'react-router-dom';
 import { QuickPaymentModal } from '@/components/ui/quick-payment-modal';
 import { Client, Mensalidade } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { RevenueByFilialChart } from '@/components/dashboard/RevenueByFilialChart';
+import { InadimplenciaAnalysis } from '@/components/dashboard/InadimplenciaAnalysis';
+import { FinancialProjections } from '@/components/dashboard/FinancialProjections';
 
 // Mock data for enhanced charts
 const paymentData = [
@@ -383,8 +386,9 @@ export default function Dashboard() {
 
       {/* Enhanced Charts Section */}
       <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto">
           <TabsTrigger value="overview" className="text-xs sm:text-sm">Visão Geral</TabsTrigger>
+          <TabsTrigger value="financial" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
           <TabsTrigger value="payments" className="text-xs sm:text-sm">Pagamentos</TabsTrigger>
           <TabsTrigger value="growth" className="text-xs sm:text-sm">Crescimento</TabsTrigger>
           <TabsTrigger value="distribution" className="text-xs sm:text-sm">Distribuição</TabsTrigger>
@@ -447,6 +451,17 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="financial" className="space-y-4 sm:space-y-6">
+          {/* Financial Projections */}
+          <FinancialProjections />
+
+          {/* Revenue by Filial */}
+          <RevenueByFilialChart />
+
+          {/* Inadimplência Analysis */}
+          <InadimplenciaAnalysis />
         </TabsContent>
 
         <TabsContent value="payments" className="space-y-4 sm:space-y-6">
