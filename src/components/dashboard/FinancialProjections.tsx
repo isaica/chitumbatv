@@ -2,9 +2,15 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, DollarSign, Calendar, Target } from 'lucide-react';
-import { mockFiliais, mockClients, mockMensalidades } from '@/data/mock';
+import { Filial, Client, Mensalidade } from '@/types';
 
-export function FinancialProjections() {
+interface FinancialProjectionsProps {
+  filiais: Filial[];
+  clients: Client[];
+  mensalidades: Mensalidade[];
+}
+
+export function FinancialProjections({ filiais, clients, mensalidades }: FinancialProjectionsProps) {
   const currentDate = new Date();
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
@@ -16,11 +22,11 @@ export function FinancialProjections() {
     const month = monthDate.getMonth() + 1;
     const year = monthDate.getFullYear();
     
-    const monthlyRevenue = mockMensalidades
+    const monthlyRevenue = mensalidades
       .filter(m => m.month === month && m.year === year && m.status === 'pago')
       .reduce((sum, m) => sum + m.amount, 0);
 
-    const monthlyPendente = mockMensalidades
+    const monthlyPendente = mensalidades
       .filter(m => m.month === month && m.year === year && m.status === 'pendente')
       .reduce((sum, m) => sum + m.amount, 0);
 
@@ -54,8 +60,10 @@ export function FinancialProjections() {
   const combinedData = [...historicalData, ...projectionData];
 
   // Calculate key metrics
-  const totalActiveClients = mockClients.filter(c => c.status === 'ativo').length;
-  const avgMonthlyPrice = mockFiliais.reduce((sum, f) => sum + f.monthlyPrice, 0) / mockFiliais.length;
+  const totalActiveClients = clients.filter(c => c.status === 'ativo').length;
+  const avgMonthlyPrice = filiais.length > 0 
+    ? filiais.reduce((sum, f) => sum + f.monthlyPrice, 0) / filiais.length 
+    : 0;
   const maxPotentialRevenue = totalActiveClients * avgMonthlyPrice;
   
   const currentRevenue = historicalData[historicalData.length - 1].receita;

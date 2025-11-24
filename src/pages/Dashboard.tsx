@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart
@@ -16,11 +16,12 @@ import { exportToPDF } from '@/utils/export';
 import { calculateClientPaymentStatus } from '@/utils/paymentStatus';
 import { useNavigate } from 'react-router-dom';
 import { QuickPaymentModal } from '@/components/ui/quick-payment-modal';
-import { Client, Mensalidade } from '@/types';
+import { Client, Mensalidade, Filial } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { RevenueByFilialChart } from '@/components/dashboard/RevenueByFilialChart';
 import { InadimplenciaAnalysis } from '@/components/dashboard/InadimplenciaAnalysis';
 import { FinancialProjections } from '@/components/dashboard/FinancialProjections';
+import { loadOrInit } from '@/services/storage';
 
 // Mock data for enhanced charts
 const paymentData = [
@@ -149,10 +150,23 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
-  const [mensalidades, setMensalidades] = useState<Mensalidade[]>(mockMensalidades);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [mensalidades, setMensalidades] = useState<Mensalidade[]>([]);
+  const [filiais, setFiliais] = useState<Filial[]>([]);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
   const currentMonth = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+
+  // Load data from storage
+  useEffect(() => {
+    const loadedClients = loadOrInit<Client[]>('clients', mockClients);
+    const loadedMensalidades = loadOrInit<Mensalidade[]>('mensalidades', mockMensalidades);
+    const loadedFiliais = loadOrInit<Filial[]>('filiais', mockFiliais);
+    
+    setClients(loadedClients);
+    setMensalidades(loadedMensalidades);
+    setFiliais(loadedFiliais);
+  }, []);
 
   const handlePayment = (mensalidadeIds: string[]) => {
     // Separate existing IDs from virtual/future ones
@@ -166,8 +180,8 @@ export default function Dashboard() {
       const year = parseInt(parts[parts.length - 2]);
       const month = parseInt(parts[parts.length - 1]);
       
-      const client = mockClients.find(c => c.id === clientId);
-      const filial = client ? mockFiliais.find(f => f.id === client.filialId) : null;
+      const client = clients.find(c => c.id === clientId);
+      const filial = client ? filiais.find(f => f.id === client.filialId) : null;
       
       return {
         id: `${clientId}-${year}-${month}-${Date.now()}`,
@@ -200,21 +214,19 @@ export default function Dashboard() {
     setSelectedClientForPayment(null);
   };
   
-  const metrics = mockDashboardMetrics;
-
   // Filter data based on user role and filial
   const userFilials = user?.role === 'admin' 
-    ? mockFiliais 
-    : mockFiliais.filter(f => f.id === user?.filialId);
+    ? filiais 
+    : filiais.filter(f => f.id === user?.filialId);
 
   const userFilialClients = user?.role === 'admin' 
-    ? mockClients 
-    : mockClients.filter(c => c.filialId === user?.filialId);
+    ? clients 
+    : clients.filter(c => c.filialId === user?.filialId);
 
   // Calculate critical clients
   const criticalClients = userFilialClients
     .map(client => {
-      const clientMensalidades = mockMensalidades.filter(m => m.clientId === client.id);
+      const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
       const paymentStatus = calculateClientPaymentStatus(client, clientMensalidades);
       return { client, paymentStatus };
     })
@@ -225,10 +237,24 @@ export default function Dashboard() {
     .slice(0, 5);
 
   const totalOverdueClients = userFilialClients.filter(client => {
-    const clientMensalidades = mockMensalidades.filter(m => m.clientId === client.id);
+    const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
     const status = calculateClientPaymentStatus(client, clientMensalidades);
     return status.status === 'kilapeiro';
   }).length;
+
+  // Calculate metrics
+  const metrics = {
+    totalClients: userFilialClients.length,
+    activeClients: userFilialClients.filter(c => c.status === 'ativo').length,
+    monthlyPaid: mensalidades.filter(m => 
+      m.month === new Date().getMonth() + 1 && 
+      m.year === new Date().getFullYear() && 
+      m.status === 'pago'
+    ).length,
+    defaultRate: userFilialClients.length > 0 
+      ? (totalOverdueClients / userFilialClients.length) * 100 
+      : 0
+  };
 
   const recentActivities = mockActivities.slice(0, 5);
 
@@ -301,7 +327,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-3">
               {criticalClients.map(({ client, paymentStatus }) => {
-                const filial = mockFiliais.find(f => f.id === client.filialId);
+                const filial = filiais.find(f => f.id === client.filialId);
                 return (
                   <div 
                     key={client.id}
@@ -455,13 +481,13 @@ export default function Dashboard() {
 
         <TabsContent value="financial" className="space-y-4 sm:space-y-6">
           {/* Financial Projections */}
-          <FinancialProjections />
+          <FinancialProjections filiais={filiais} clients={clients} mensalidades={mensalidades} />
 
           {/* Revenue by Filial */}
-          <RevenueByFilialChart />
+          <RevenueByFilialChart filiais={filiais} clients={clients} mensalidades={mensalidades} />
 
           {/* Inadimplência Analysis */}
-          <InadimplenciaAnalysis />
+          <InadimplenciaAnalysis filiais={filiais} clients={clients} mensalidades={mensalidades} />
         </TabsContent>
 
         <TabsContent value="payments" className="space-y-4 sm:space-y-6">
