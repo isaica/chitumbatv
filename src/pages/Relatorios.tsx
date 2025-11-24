@@ -34,25 +34,41 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { mockClients, mockMensalidades, mockFiliais } from "@/data/mock";
 import { exportToExcel, exportToPDF } from "@/utils/export";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { QuickPaymentModal } from "@/components/ui/quick-payment-modal";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { Client, Mensalidade, Filial } from "@/types";
+import { loadOrInit } from "@/services/storage";
 
 export default function Relatorios() {
   const { user } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState('3months');
   const [selectedFilial, setSelectedFilial] = useState('all');
   const { toast } = useToast();
+  const [clients, setClients] = useState<Client[]>([]);
+  const [mensalidades, setMensalidades] = useState<Mensalidade[]>([]);
+  const [filiais, setFiliais] = useState<Filial[]>([]);
+
+  // Load data from storage
+  useEffect(() => {
+    const loadedClients = loadOrInit<Client[]>('clients', mockClients);
+    const loadedMensalidades = loadOrInit<Mensalidade[]>('mensalidades', mockMensalidades);
+    const loadedFiliais = loadOrInit<Filial[]>('filiais', mockFiliais);
+    
+    setClients(loadedClients);
+    setMensalidades(loadedMensalidades);
+    setFiliais(loadedFiliais);
+  }, []);
 
   // Filter data based on user role
   const availableFiliais = user?.role === 'admin' 
-    ? mockFiliais 
-    : mockFiliais.filter(f => f.id === user?.filialId);
+    ? filiais 
+    : filiais.filter(f => f.id === user?.filialId);
 
   const userFilialClients = user?.role === 'admin' 
-    ? mockClients 
-    : mockClients.filter(c => c.filialId === user?.filialId);
+    ? clients 
+    : clients.filter(c => c.filialId === user?.filialId);
 
   // Generate inadimplência data
   const getInadimplenciaData = () => {
@@ -65,14 +81,14 @@ export default function Relatorios() {
       const year = date.getFullYear();
       const month = date.getMonth() + 1;
       
-      const monthMensalidades = mockMensalidades.filter(m => 
+      const monthMensalidades = mensalidades.filter(m => 
         m.year === year && m.month === month
       );
       
       const filteredMensalidades = selectedFilial === 'all' 
         ? monthMensalidades
         : monthMensalidades.filter(m => {
-            const client = mockClients.find(c => c.id === m.clientId);
+            const client = clients.find(c => c.id === m.clientId);
             return client?.filialId === selectedFilial;
           });
 
@@ -121,7 +137,7 @@ export default function Relatorios() {
   // Calculate current month metrics
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
-  const currentMonthMensalidades = mockMensalidades.filter(m => 
+  const currentMonthMensalidades = mensalidades.filter(m => 
     m.year === currentYear && m.month === currentMonth
   );
 

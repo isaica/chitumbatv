@@ -1,22 +1,28 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { mockFiliais, mockClients, mockMensalidades } from '@/data/mock';
+import { Filial, Client, Mensalidade } from '@/types';
 
-export function RevenueByFilialChart() {
+interface RevenueByFilialChartProps {
+  filiais: Filial[];
+  clients: Client[];
+  mensalidades: Mensalidade[];
+}
+
+export function RevenueByFilialChart({ filiais, clients, mensalidades }: RevenueByFilialChartProps) {
   // Calculate revenue by filial
-  const revenueByFilial = mockFiliais.map(filial => {
-    const filialClients = mockClients.filter(c => c.filialId === filial.id);
+  const revenueByFilial = filiais.map(filial => {
+    const filialClients = clients.filter(c => c.filialId === filial.id);
     const clientIds = filialClients.map(c => c.id);
     
-    const totalReceita = mockMensalidades
+    const totalReceita = mensalidades
       .filter(m => clientIds.includes(m.clientId) && m.status === 'pago')
       .reduce((sum, m) => sum + m.amount, 0);
     
-    const pendente = mockMensalidades
+    const pendente = mensalidades
       .filter(m => clientIds.includes(m.clientId) && m.status === 'pendente')
       .reduce((sum, m) => sum + m.amount, 0);
     
-    const atrasado = mockMensalidades
+    const atrasado = mensalidades
       .filter(m => clientIds.includes(m.clientId) && m.status === 'atrasado')
       .reduce((sum, m) => sum + m.amount, 0);
 

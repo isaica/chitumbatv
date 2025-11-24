@@ -2,7 +2,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
-import { mockFiliais, mockClients, mockMensalidades } from '@/data/mock';
+import { Filial, Client, Mensalidade } from '@/types';
 import { calculateClientPaymentStatus } from '@/utils/paymentStatus';
 
 const COLORS = {
@@ -11,10 +11,16 @@ const COLORS = {
   inativo: 'hsl(var(--muted))',
 };
 
-export function InadimplenciaAnalysis() {
+interface InadimplenciaAnalysisProps {
+  filiais: Filial[];
+  clients: Client[];
+  mensalidades: Mensalidade[];
+}
+
+export function InadimplenciaAnalysis({ filiais, clients, mensalidades }: InadimplenciaAnalysisProps) {
   // Calculate inadimplência by filial
-  const inadimplenciaByFilial = mockFiliais.map(filial => {
-    const filialClients = mockClients.filter(c => c.filialId === filial.id);
+  const inadimplenciaByFilial = filiais.map(filial => {
+    const filialClients = clients.filter(c => c.filialId === filial.id);
     
     const statusCounts = {
       pago: 0,
@@ -24,14 +30,14 @@ export function InadimplenciaAnalysis() {
     };
 
     filialClients.forEach(client => {
-      const status = calculateClientPaymentStatus(client, mockMensalidades);
+      const status = calculateClientPaymentStatus(client, mensalidades);
       if (status.status === 'pago') statusCounts.pago++;
       else if (status.status === 'kilapeiro') statusCounts.kilapeiro++;
       else if (status.status === 'inativo') statusCounts.inativo++;
     });
 
     const totalDebt = filialClients.reduce((sum, client) => {
-      const status = calculateClientPaymentStatus(client, mockMensalidades);
+      const status = calculateClientPaymentStatus(client, mensalidades);
       return sum + status.totalDebt;
     }, 0);
 
