@@ -317,6 +317,30 @@ export default function Clientes() {
     });
   };
 
+  const handleReactivateClient = (clientId: string, reason: string, responsible: string) => {
+    setClients(prev => prev.map(c => 
+      c.id === clientId 
+        ? { ...c, status: 'ativo' as const }
+        : c
+    ));
+    
+    // Log the reactivation information (could be saved to a reactivation history table)
+    console.log('Cliente reativado:', {
+      clientId,
+      reason,
+      responsible,
+      reactivatedAt: new Date().toISOString()
+    });
+
+    // Close details modal after reactivation
+    setIsDetailsOpen(false);
+    
+    toast({
+      title: 'Cliente reativado',
+      description: 'O cliente foi reativado com sucesso.',
+    });
+  };
+
   const handleSelectAll = () => {
     if (selectedClients.length === filteredClients.length) {
       setSelectedClients([]);
@@ -1159,6 +1183,7 @@ export default function Clientes() {
         mensalidades={mensalidades}
         onRegisterPayment={handleRegisterPayment}
         onDeactivateClient={handleDeactivateClient}
+        onReactivateClient={handleReactivateClient}
       />
 
       {/* Quick Payment Modal */}

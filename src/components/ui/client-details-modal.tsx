@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { User, MapPin, Phone, Mail, Calendar, CreditCard, AlertCircle, TrendingUp, CheckCircle2, XCircle, UserX } from 'lucide-react';
+import { User, MapPin, Phone, Mail, Calendar, CreditCard, AlertCircle, TrendingUp, CheckCircle2, XCircle, UserX, UserCheck } from 'lucide-react';
 import { Client, Mensalidade } from '@/types';
 import { ClientPaymentStatus, getStatusLabel, getStatusColor } from '@/utils/paymentStatus';
 import { mockFiliais } from '@/data/mock';
@@ -21,6 +21,7 @@ interface ClientDetailsModalProps {
   mensalidades: Mensalidade[];
   onRegisterPayment?: (clientId: string) => void;
   onDeactivateClient?: (clientId: string, reason: string, technician: string) => void;
+  onReactivateClient?: (clientId: string, reason: string, responsible: string) => void;
 }
 
 export function ClientDetailsModal({
@@ -30,12 +31,17 @@ export function ClientDetailsModal({
   paymentStatus,
   mensalidades,
   onRegisterPayment,
-  onDeactivateClient
+  onDeactivateClient,
+  onReactivateClient
 }: ClientDetailsModalProps) {
   const { toast } = useToast();
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [deactivateReason, setDeactivateReason] = useState('');
   const [technicianName, setTechnicianName] = useState('');
+  
+  const [showReactivateDialog, setShowReactivateDialog] = useState(false);
+  const [reactivateReason, setReactivateReason] = useState('');
+  const [responsibleName, setResponsibleName] = useState('');
 
   if (!client) return null;
 
@@ -61,6 +67,31 @@ export function ClientDetailsModal({
     toast({
       title: 'Cliente desativado',
       description: `${client.name} foi desativado com sucesso.`
+    });
+  };
+
+  const handleReactivateSubmit = () => {
+    if (!reactivateReason.trim() || !responsibleName.trim()) {
+      toast({
+        title: 'Campos obrigatórios',
+        description: 'Por favor, preencha todos os campos antes de reativar o cliente.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (onReactivateClient) {
+      onReactivateClient(client.id, reactivateReason, responsibleName);
+    }
+
+    // Reset form
+    setReactivateReason('');
+    setResponsibleName('');
+    setShowReactivateDialog(false);
+    
+    toast({
+      title: 'Cliente reativado',
+      description: `${client.name} foi reativado com sucesso.`
     });
   };
 
@@ -382,7 +413,7 @@ export function ClientDetailsModal({
 
           {/* Actions */}
           <div className="flex justify-between gap-3 pt-4">
-            <div>
+            <div className="flex gap-2">
               {client.status === 'ativo' && (
                 <Button 
                   variant="destructive" 
@@ -390,6 +421,16 @@ export function ClientDetailsModal({
                 >
                   <UserX className="w-4 h-4 mr-2" />
                   Desativar Cliente
+                </Button>
+              )}
+              {client.status === 'inativo' && (
+                <Button 
+                  variant="default"
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => setShowReactivateDialog(true)}
+                >
+                  <UserCheck className="w-4 h-4 mr-2" />
+                  Reativar Cliente
                 </Button>
               )}
             </div>
@@ -459,6 +500,70 @@ export function ClientDetailsModal({
               onClick={handleDeactivateSubmit}
             >
               Confirmar Desativação
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reactivate Client Dialog */}
+      <Dialog open={showReactivateDialog} onOpenChange={setShowReactivateDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-green-600" />
+              Reativar Cliente
+            </DialogTitle>
+            <DialogDescription>
+              Informe os motivos da reativação e o responsável pela reconexão do sinal
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="responsible">Nome do Responsável *</Label>
+              <Input
+                id="responsible"
+                placeholder="Ex: Maria Santos"
+                value={responsibleName}
+                onChange={(e) => setResponsibleName(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="reactivate-reason">Motivo da Reativação *</Label>
+              <Textarea
+                id="reactivate-reason"
+                placeholder="Descreva os motivos para reativar este cliente..."
+                value={reactivateReason}
+                onChange={(e) => setReactivateReason(e.target.value)}
+                rows={4}
+              />
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-sm text-green-800">
+                <strong>Atenção:</strong> Esta ação irá reativar o cliente <strong>{client.name}</strong>. 
+                O cliente poderá voltar a utilizar os serviços.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowReactivateDialog(false);
+                setReactivateReason('');
+                setResponsibleName('');
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              className="bg-green-600 hover:bg-green-700"
+              onClick={handleReactivateSubmit}
+            >
+              Confirmar Reativação
             </Button>
           </div>
         </DialogContent>
