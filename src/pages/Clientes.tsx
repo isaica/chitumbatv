@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal, User, CreditCard, AlertCircle, DollarSign, Download, FileText, FileSpreadsheet, FileDown, Printer, Users, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal, User, CreditCard, AlertCircle, DollarSign, Download, FileText, FileSpreadsheet, FileDown, Printer, Users, CheckCircle, XCircle, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,6 +32,8 @@ import { generateReceipt } from '@/utils/receipt';
 import { VirtualTableBody } from '@/components/ui/virtual-table-body';
 import { useRef } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { DateRangeFilter, FilterBar } from '@/components/ui/advanced-filters';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const clientSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -73,6 +75,15 @@ export default function Clientes() {
   const [paymentClient, setPaymentClient] = useState<Client | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
+  
+  // Advanced Filters
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [minDebt, setMinDebt] = useState<string>('');
+  const [maxDebt, setMaxDebt] = useState<string>('');
+  const [addressSearch, setAddressSearch] = useState<string>('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -122,8 +133,26 @@ export default function Clientes() {
     
     const hasAccess = user?.role === 'admin' || client.filialId === user?.filialId;
     
-    return matchesSearch && matchesStatus && matchesFilial && hasAccess;
-  }), [clientsWithPaymentStatus, searchTerm, statusFilter, filialFilter, user]);
+    // Advanced Filters
+    const matchesDateRange = (!startDate || !endDate) || 
+      (client.createdAt >= startDate && client.createdAt <= endDate);
+    
+    const matchesDebtRange = (() => {
+      const minDebtNum = parseFloat(minDebt) || 0;
+      const maxDebtNum = parseFloat(maxDebt) || Infinity;
+      const clientDebt = client.paymentStatus.totalDebt;
+      return clientDebt >= minDebtNum && clientDebt <= maxDebtNum;
+    })();
+    
+    const matchesAddress = !addressSearch || 
+      client.address.street.toLowerCase().includes(addressSearch.toLowerCase()) ||
+      client.address.neighborhood.toLowerCase().includes(addressSearch.toLowerCase()) ||
+      client.address.city.toLowerCase().includes(addressSearch.toLowerCase()) ||
+      client.address.province.toLowerCase().includes(addressSearch.toLowerCase());
+    
+    return matchesSearch && matchesStatus && matchesFilial && hasAccess && 
+           matchesDateRange && matchesDebtRange && matchesAddress;
+  }), [clientsWithPaymentStatus, searchTerm, statusFilter, filialFilter, user, startDate, endDate, minDebt, maxDebt, addressSearch]);
 
   const getFilialName = (filialId: string) => {
     return mockFiliais.find(f => f.id === filialId)?.name || 'N/A';
@@ -224,7 +253,21 @@ export default function Clientes() {
     setSearchTerm('');
     setStatusFilter('all');
     setFilialFilter('all');
+    setStartDate(undefined);
+    setEndDate(undefined);
+    setMinDebt('');
+    setMaxDebt('');
+    setAddressSearch('');
   };
+  
+  // Count active advanced filters
+  const activeAdvancedFiltersCount = useMemo(() => {
+    let count = 0;
+    if (startDate && endDate) count++;
+    if (minDebt || maxDebt) count++;
+    if (addressSearch) count++;
+    return count;
+  }, [startDate, endDate, minDebt, maxDebt, addressSearch]);
 
   const handleViewDetails = (client: Client) => {
     setDetailsClient(client);
@@ -701,6 +744,85 @@ export default function Clientes() {
             )}
           </div>
 
+          {/* Advanced Filters */}
+          <Collapsible open={showAdvancedFilters} onOpenChange={setShowAdvancedFilters}>
+            <div className="flex items-center justify-between">
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <Filter className="w-4 h-4" />
+                  Filtros Avançados
+                  {activeAdvancedFiltersCount > 0 && (
+                    <Badge variant="secondary" className="ml-1">
+                      {activeAdvancedFiltersCount}
+                    </Badge>
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+            
+            <CollapsibleContent className="space-y-4 pt-4">
+              <FilterBar
+                activeFiltersCount={activeAdvancedFiltersCount}
+                onClearAll={() => {
+                  setStartDate(undefined);
+                  setEndDate(undefined);
+                  setMinDebt('');
+                  setMaxDebt('');
+                  setAddressSearch('');
+                }}
+              >
+                <div className="w-full">
+                  <Label className="text-sm font-medium mb-2 block">Data de Cadastro</Label>
+                  <DateRangeFilter
+                    startDate={startDate}
+                    endDate={endDate}
+                    onDateChange={(start, end) => {
+                      setStartDate(start);
+                      setEndDate(end);
+                    }}
+                    placeholder="Selecionar período"
+                  />
+                </div>
+                
+                <div className="w-full space-y-2">
+                  <Label className="text-sm font-medium">Valor de Dívida</Label>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      type="number"
+                      placeholder="Mínimo (AOA)"
+                      value={minDebt}
+                      onChange={(e) => setMinDebt(e.target.value)}
+                      min="0"
+                      className="w-full"
+                    />
+                    <span className="text-muted-foreground">até</span>
+                    <Input
+                      type="number"
+                      placeholder="Máximo (AOA)"
+                      value={maxDebt}
+                      onChange={(e) => setMaxDebt(e.target.value)}
+                      min="0"
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+                
+                <div className="w-full space-y-2">
+                  <Label className="text-sm font-medium">Endereço</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                      placeholder="Buscar por rua, bairro, cidade..."
+                      value={addressSearch}
+                      onChange={(e) => setAddressSearch(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+              </FilterBar>
+            </CollapsibleContent>
+          </Collapsible>
+
           {/* Bulk Actions */}
           {selectedClients.length > 0 && (
             <div className="flex flex-wrap gap-2 items-center p-3 bg-muted/50 rounded-lg">
@@ -732,7 +854,8 @@ export default function Clientes() {
 
       {/* Results */}
       {filteredClients.length === 0 ? (
-        searchTerm || statusFilter !== 'all' || filialFilter !== 'all' ? (
+        searchTerm || statusFilter !== 'all' || filialFilter !== 'all' || 
+        startDate || endDate || minDebt || maxDebt || addressSearch ? (
           <NoSearchResults searchTerm={searchTerm} onClear={clearSearch} />
         ) : (
           <NoClients onCreate={() => handleOpenDialog()} />
