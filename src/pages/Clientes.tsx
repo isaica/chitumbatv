@@ -293,6 +293,30 @@ export default function Clientes() {
     setIsPaymentModalOpen(false);
   };
 
+  const handleDeactivateClient = (clientId: string, reason: string, technician: string) => {
+    setClients(prev => prev.map(c => 
+      c.id === clientId 
+        ? { ...c, status: 'inativo' as const }
+        : c
+    ));
+    
+    // Log the deactivation information (could be saved to a deactivation history table)
+    console.log('Cliente desativado:', {
+      clientId,
+      reason,
+      technician,
+      deactivatedAt: new Date().toISOString()
+    });
+
+    // Close details modal after deactivation
+    setIsDetailsOpen(false);
+    
+    toast({
+      title: 'Cliente desativado',
+      description: 'O cliente foi desativado com sucesso.',
+    });
+  };
+
   const handleSelectAll = () => {
     if (selectedClients.length === filteredClients.length) {
       setSelectedClients([]);
@@ -1134,6 +1158,7 @@ export default function Clientes() {
         paymentStatus={detailsClient ? calculateClientPaymentStatus(detailsClient, mensalidades) : {} as ClientPaymentStatus}
         mensalidades={mensalidades}
         onRegisterPayment={handleRegisterPayment}
+        onDeactivateClient={handleDeactivateClient}
       />
 
       {/* Quick Payment Modal */}
