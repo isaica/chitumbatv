@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal, User, CreditCard, AlertCircle, DollarSign } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal, User, CreditCard, AlertCircle, DollarSign, Download, FileText, FileSpreadsheet, FileDown, Printer, Users, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,10 +27,11 @@ import { NoClients, NoSearchResults } from '@/components/ui/empty-states';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { MobileTable, MobileCard, MobileActionMenu, StatusBadge } from '@/components/ui/mobile-table';
 import { useResponsive } from '@/hooks/use-responsive';
-import { exportToExcel } from '@/utils/export';
+import { exportToExcel, exportToPDF, exportToCSV, ExportColumn, ExportOptions } from '@/utils/export';
 import { generateReceipt } from '@/utils/receipt';
 import { VirtualTableBody } from '@/components/ui/virtual-table-body';
 import { useRef } from 'react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const clientSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -306,6 +307,85 @@ export default function Clientes() {
     return mensalidades.find(m => m.clientId === clientId && m.month === month && m.year === year && m.status === 'pago');
   };
 
+  const getLastPaymentDate = (clientId: string) => {
+    const paidMensalidades = mensalidades
+      .filter(m => m.clientId === clientId && m.status === 'pago')
+      .sort((a, b) => new Date(b.paidAt!).getTime() - new Date(a.paidAt!).getTime());
+    
+    return paidMensalidades[0]?.paidAt;
+  };
+
+  const handleExport = (format: 'pdf' | 'excel' | 'csv') => {
+    const exportData = filteredClients.map(client => ({
+      name: client.name,
+      phone: client.phone,
+      email: client.email,
+      filial: getFilialName(client.filialId),
+      status: getStatusLabel(client.paymentStatus.status),
+      lastPayment: getLastPaymentDate(client.id),
+      overdueMonths: client.paymentStatus.overdueCount,
+      totalDebt: client.paymentStatus.totalDebt,
+      createdAt: client.createdAt
+    }));
+
+    const columns: ExportColumn[] = [
+      { key: 'name', title: 'Nome', width: 40 },
+      { key: 'phone', title: 'Telefone', width: 25 },
+      { key: 'email', title: 'Email', width: 35 },
+      { key: 'filial', title: 'Filial', width: 30 },
+      { key: 'status', title: 'Status', width: 20 },
+      { 
+        key: 'lastPayment', 
+        title: 'Último Pagamento', 
+        width: 25,
+        format: (value) => value ? new Date(value).toLocaleDateString('pt-AO') : 'Nunca'
+      },
+      { 
+        key: 'totalDebt', 
+        title: 'Dívida Total', 
+        width: 25,
+        format: (value) => formatCurrency(value)
+      },
+      { key: 'overdueMonths', title: 'Meses em Atraso', width: 20 },
+    ];
+
+    let subtitle = 'Todos os clientes';
+    if (statusFilter !== 'all') {
+      subtitle = `Clientes ${getStatusLabel(statusFilter)}`;
+    }
+    if (filialFilter !== 'all') {
+      const filialName = getFilialName(filialFilter);
+      subtitle += ` - Filial ${filialName}`;
+    }
+
+    const options: ExportOptions = {
+      filename: `clientes_${statusFilter}_${new Date().toISOString().split('T')[0]}`,
+      title: 'Lista de Clientes - ALF Chitumba',
+      subtitle,
+      columns,
+      data: exportData,
+      author: user?.name || 'Sistema',
+      orientation: 'landscape'
+    };
+
+    switch (format) {
+      case 'pdf':
+        exportToPDF(options);
+        break;
+      case 'excel':
+        exportToExcel(options);
+        break;
+      case 'csv':
+        exportToCSV(options);
+        break;
+    }
+
+    toast({
+      title: 'Exportação concluída!',
+      description: `${filteredClients.length} clientes exportados em ${format.toUpperCase()}.`,
+    });
+  };
+
   return (
     <div className="space-y-6">
       <Breadcrumbs />
@@ -493,10 +573,93 @@ export default function Clientes() {
         </Dialog>
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-0 shadow-primary">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total de Clientes</p>
+                <h3 className="text-2xl font-bold mt-2">{clientsWithPaymentStatus.length}</h3>
+              </div>
+              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                <Users className="w-6 h-6 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-0 shadow-primary">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Pagos</p>
+                <h3 className="text-2xl font-bold mt-2 text-green-600">{paidCount}</h3>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-0 shadow-primary">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Kilapeiros</p>
+                <h3 className="text-2xl font-bold mt-2 text-red-600">{kilapeiroCount}</h3>
+              </div>
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertCircle className="w-6 h-6 text-red-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-0 shadow-primary">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Inativos</p>
+                <h3 className="text-2xl font-bold mt-2 text-gray-600">{inativoCount}</h3>
+              </div>
+              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+                <XCircle className="w-6 h-6 text-gray-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Filters */}
       <Card className="border-0 shadow-primary">
         <CardHeader>
-          <CardTitle className="text-lg">Filtros</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Filtros</CardTitle>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Download className="w-4 h-4 mr-2" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Exportar PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('excel')}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Exportar Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('csv')}>
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Exportar CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Search and Filters */}
@@ -641,8 +804,12 @@ export default function Clientes() {
                               <p className="font-medium">{getFilialName(client.filialId)}</p>
                             </div>
                             <div>
-                              <p className="text-muted-foreground">Documento</p>
-                              <p className="font-medium">{client.document}</p>
+                              <p className="text-muted-foreground">Último Pagamento</p>
+                              <p className="font-medium">
+                                {getLastPaymentDate(client.id) 
+                                  ? new Date(getLastPaymentDate(client.id)!).toLocaleDateString('pt-AO')
+                                  : 'Nunca'}
+                              </p>
                             </div>
                           </div>
 
@@ -682,9 +849,8 @@ export default function Clientes() {
                           <TableHead>Cliente</TableHead>
                           <TableHead>Contato</TableHead>
                           <TableHead>Status de Pagamento</TableHead>
-                          <TableHead>Dívida</TableHead>
+                          <TableHead>Último Pagamento</TableHead>
                           <TableHead>Filial</TableHead>
-                          <TableHead>Documento</TableHead>
                           <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -723,9 +889,26 @@ export default function Clientes() {
                             <TableCell>
                               <div className="space-y-2">
                                 <div className="flex items-center gap-2">
-                                  <Badge className={`${getStatusColor(client.paymentStatus.status)} border`}>
-                                    {getStatusLabel(client.paymentStatus.status)}
-                                  </Badge>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <Badge className={`${getStatusColor(client.paymentStatus.status)} border`}>
+                                          {getStatusLabel(client.paymentStatus.status)}
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        {client.paymentStatus.status === 'kilapeiro' && (
+                                          <p>{client.paymentStatus.overdueCount} mês(es) em atraso</p>
+                                        )}
+                                        {client.paymentStatus.status === 'pago' && (
+                                          <p>Todas as mensalidades em dia</p>
+                                        )}
+                                        {client.paymentStatus.status === 'inativo' && (
+                                          <p>Cliente inativo</p>
+                                        )}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                   {getCurrentPaidMensalidade(client.id) && (
                                     <Button size="sm" variant="outline" onClick={() => generateReceipt(getCurrentPaidMensalidade(client.id)!)}>
                                       Recibo
@@ -741,58 +924,69 @@ export default function Clientes() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              {client.paymentStatus.totalDebt > 0 ? (
-                                <div className="space-y-1">
-                                  <p className="font-semibold text-red-600">
-                                    {formatCurrency(client.paymentStatus.totalDebt)}
-                                  </p>
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium">
+                                  {getLastPaymentDate(client.id) 
+                                    ? new Date(getLastPaymentDate(client.id)!).toLocaleDateString('pt-AO')
+                                    : 'Nunca'}
+                                </p>
+                                {getLastPaymentDate(client.id) && (
                                   <p className="text-xs text-muted-foreground">
-                                    {client.paymentStatus.overdueMonths.slice(0, 2).join(', ')}
-                                    {client.paymentStatus.overdueMonths.length > 2 && '...'}
+                                    {Math.floor((new Date().getTime() - new Date(getLastPaymentDate(client.id)!).getTime()) / (1000 * 60 * 60 * 24))} dias atrás
                                   </p>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1 text-green-600">
-                                  <CreditCard className="w-4 h-4" />
-                                  <span className="text-sm font-medium">Em dia</span>
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <span className="font-medium">{getFilialName(client.filialId)}</span>
                             </TableCell>
-                            <TableCell>
-                              <span className="font-mono text-sm">{client.document}</span>
-                            </TableCell>
                             <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreHorizontal className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleViewDetails(client)}>
-                                    <Eye className="w-4 h-4 mr-2" />
-                                    Ver Detalhes
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleRegisterPayment(client.id)}>
-                                    <CreditCard className="w-4 h-4 mr-2" />
-                                    Registrar Pagamento
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleOpenDialog(client)}>
-                                    <Edit className="w-4 h-4 mr-2" />
-                                    Editar
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    className="text-destructive"
-                                    onClick={() => handleDelete(client)}
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    Excluir
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              <div className="flex items-center justify-end gap-2">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm"
+                                        onClick={() => handleExport('pdf')}
+                                      >
+                                        <Printer className="w-4 h-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Imprimir ficha do cliente</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <MoreHorizontal className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleViewDetails(client)}>
+                                      <Eye className="w-4 h-4 mr-2" />
+                                      Ver Detalhes
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleRegisterPayment(client.id)}>
+                                      <CreditCard className="w-4 h-4 mr-2" />
+                                      Registrar Pagamento
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleOpenDialog(client)}>
+                                      <Edit className="w-4 h-4 mr-2" />
+                                      Editar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      className="text-destructive"
+                                      onClick={() => handleDelete(client)}
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Excluir
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             </TableCell>
                           </TableRow>
                         )}
