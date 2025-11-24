@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { User, MapPin, Phone, Mail, Calendar, CreditCard, AlertCircle, TrendingUp, CheckCircle2, XCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { User, MapPin, Phone, Mail, Calendar, CreditCard, AlertCircle, TrendingUp, CheckCircle2, XCircle, UserX } from 'lucide-react';
 import { Client, Mensalidade } from '@/types';
 import { ClientPaymentStatus, getStatusLabel, getStatusColor } from '@/utils/paymentStatus';
 import { mockFiliais } from '@/data/mock';
+import { useToast } from '@/hooks/use-toast';
 
 interface ClientDetailsModalProps {
   client: Client | null;
@@ -16,6 +20,7 @@ interface ClientDetailsModalProps {
   paymentStatus: ClientPaymentStatus;
   mensalidades: Mensalidade[];
   onRegisterPayment?: (clientId: string) => void;
+  onDeactivateClient?: (clientId: string, reason: string, technician: string) => void;
 }
 
 export function ClientDetailsModal({
@@ -24,9 +29,40 @@ export function ClientDetailsModal({
   onClose,
   paymentStatus,
   mensalidades,
-  onRegisterPayment
+  onRegisterPayment,
+  onDeactivateClient
 }: ClientDetailsModalProps) {
+  const { toast } = useToast();
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+  const [deactivateReason, setDeactivateReason] = useState('');
+  const [technicianName, setTechnicianName] = useState('');
+
   if (!client) return null;
+
+  const handleDeactivateSubmit = () => {
+    if (!deactivateReason.trim() || !technicianName.trim()) {
+      toast({
+        title: 'Campos obrigatórios',
+        description: 'Por favor, preencha todos os campos antes de desativar o cliente.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (onDeactivateClient) {
+      onDeactivateClient(client.id, deactivateReason, technicianName);
+    }
+
+    // Reset form
+    setDeactivateReason('');
+    setTechnicianName('');
+    setShowDeactivateDialog(false);
+    
+    toast({
+      title: 'Cliente desativado',
+      description: `${client.name} foi desativado com sucesso.`
+    });
+  };
 
   const filial = mockFiliais.find(f => f.id === client.filialId);
   const clientMensalidades = mensalidades
@@ -345,13 +381,88 @@ export function ClientDetailsModal({
           </Card>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-between gap-3 pt-4">
+            <div>
+              {client.status === 'ativo' && (
+                <Button 
+                  variant="destructive" 
+                  onClick={() => setShowDeactivateDialog(true)}
+                >
+                  <UserX className="w-4 h-4 mr-2" />
+                  Desativar Cliente
+                </Button>
+              )}
+            </div>
             <Button variant="outline" onClick={onClose}>
               Fechar
             </Button>
           </div>
         </div>
       </DialogContent>
+
+      {/* Deactivate Client Dialog */}
+      <Dialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserX className="w-5 h-5 text-destructive" />
+              Desativar Cliente
+            </DialogTitle>
+            <DialogDescription>
+              Informe os motivos da desativação e o técnico responsável pelo corte do sinal
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="technician">Nome do Técnico *</Label>
+              <Input
+                id="technician"
+                placeholder="Ex: João Silva"
+                value={technicianName}
+                onChange={(e) => setTechnicianName(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="reason">Motivo da Desativação *</Label>
+              <Textarea
+                id="reason"
+                placeholder="Descreva os motivos para desativar este cliente..."
+                value={deactivateReason}
+                onChange={(e) => setDeactivateReason(e.target.value)}
+                rows={4}
+              />
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-sm text-amber-800">
+                <strong>Atenção:</strong> Esta ação irá desativar o cliente <strong>{client.name}</strong>. 
+                O histórico de pagamentos será mantido.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowDeactivateDialog(false);
+                setDeactivateReason('');
+                setTechnicianName('');
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleDeactivateSubmit}
+            >
+              Confirmar Desativação
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
