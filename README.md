@@ -1,6 +1,6 @@
 # Welcome to myLovable project Chitumba
 
-## Project info
+##  Info do Project
 
 
 ## Devo eliminar algumas info depois de passar ao Trae
