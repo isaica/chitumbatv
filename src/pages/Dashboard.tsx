@@ -452,7 +452,7 @@ export default function Dashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ActionHistory actions={mockActionHistory} maxItems={4} />
+                <ActionHistory actions={mockActionHistory} compact />
               </CardContent>
             </Card>
           </div>
@@ -631,13 +631,12 @@ export default function Dashboard() {
         <QuickPaymentModal
           client={selectedClientForPayment}
           mensalidades={mensalidades.filter(m => m.clientId === selectedClientForPayment.id)}
-          filial={filiais.find(f => f.id === selectedClientForPayment.filialId)}
-          isOpen={isPaymentModalOpen}
+          open={isPaymentModalOpen}
           onClose={() => {
             setIsPaymentModalOpen(false);
             setSelectedClientForPayment(null);
           }}
-          onConfirm={handlePayment}
+          onPayment={handlePayment}
         />
       )}
     </div>
