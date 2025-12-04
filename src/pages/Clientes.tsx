@@ -769,13 +769,17 @@ export default function Clientes() {
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-4">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <DateRangeFilter
-                    startDate={startDate}
-                    endDate={endDate}
-                    onStartDateChange={setStartDate}
-                    onEndDateChange={setEndDate}
-                    label="Data de Cadastro"
-                  />
+                  <div className="space-y-2">
+                    <Label>Data de Cadastro</Label>
+                    <DateRangeFilter
+                      startDate={startDate}
+                      endDate={endDate}
+                      onDateChange={(start, end) => {
+                        setStartDate(start);
+                        setEndDate(end);
+                      }}
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label>Dívida Mínima (AOA)</Label>
                     <Input
@@ -851,7 +855,7 @@ export default function Clientes() {
                       Clientes ({paginationInfo.totalItems})
                     </CardTitle>
                     <CardDescription className="text-xs sm:text-sm">
-                      Mostrando {paginationInfo.startItem}-{paginationInfo.endItem} de {paginationInfo.totalItems}
+                      Mostrando {paginationInfo.startIndex + 1}-{Math.min(paginationInfo.endIndex, paginationInfo.totalItems)} de {paginationInfo.totalItems}
                     </CardDescription>
                   </div>
                 </CardHeader>
@@ -861,22 +865,29 @@ export default function Clientes() {
                       {paginatedClients.map((client) => (
                         <MobileCard
                           key={client.id}
-                          title={client.name}
-                          subtitle={getFilialName(client.filialId)}
-                          status={<StatusBadge status={client.paymentStatus.status} label={getStatusLabel(client.paymentStatus.status)} />}
-                          details={[
-                            { label: 'Telefone', value: client.phone },
-                            { label: 'Dívida', value: formatCurrency(client.paymentStatus.totalDebt) },
-                          ]}
                           actions={
                             <MobileActionMenu
-                              onView={() => handleViewDetails(client)}
-                              onEdit={() => handleOpenDialog(client)}
-                              onDelete={() => handleDelete(client)}
-                              onPayment={() => handleRegisterPayment(client.id)}
+                              actions={[
+                                { label: 'Ver Detalhes', onClick: () => handleViewDetails(client) },
+                                { label: 'Registrar Pagamento', onClick: () => handleRegisterPayment(client.id) },
+                                { label: 'Editar', onClick: () => handleOpenDialog(client) },
+                                { label: 'Excluir', onClick: () => handleDelete(client), variant: 'destructive' },
+                              ]}
                             />
                           }
-                        />
+                        >
+                          <div className="font-medium">{client.name}</div>
+                          <div className="text-sm text-muted-foreground">{getFilialName(client.filialId)}</div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <StatusBadge status={getStatusLabel(client.paymentStatus.status)} />
+                          </div>
+                          <div className="mt-2 text-sm">
+                            <span className="text-muted-foreground">Telefone:</span> {client.phone}
+                          </div>
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">Dívida:</span> {formatCurrency(client.paymentStatus.totalDebt)}
+                          </div>
+                        </MobileCard>
                       ))}
                     </div>
                   ) : (
@@ -984,15 +995,15 @@ export default function Clientes() {
         <ClientDetailsModal
           client={detailsClient}
           mensalidades={mensalidades.filter(m => m.clientId === detailsClient.id)}
-          filial={filiais.find(f => f.id === detailsClient.filialId)}
+          paymentStatus={calculateClientPaymentStatus(detailsClient, mensalidades.filter(m => m.clientId === detailsClient.id))}
           isOpen={isDetailsOpen}
           onClose={() => {
             setIsDetailsOpen(false);
             setDetailsClient(null);
           }}
           onRegisterPayment={() => handleRegisterPayment(detailsClient.id)}
-          onDeactivate={handleDeactivateClient}
-          onReactivate={handleReactivateClient}
+          onDeactivateClient={handleDeactivateClient}
+          onReactivateClient={handleReactivateClient}
         />
       )}
 
@@ -1001,13 +1012,12 @@ export default function Clientes() {
         <QuickPaymentModal
           client={paymentClient}
           mensalidades={mensalidades.filter(m => m.clientId === paymentClient.id)}
-          filial={filiais.find(f => f.id === paymentClient.filialId)}
-          isOpen={isPaymentModalOpen}
+          open={isPaymentModalOpen}
           onClose={() => {
             setIsPaymentModalOpen(false);
             setPaymentClient(null);
           }}
-          onConfirm={handleConfirmPayment}
+          onPayment={handleConfirmPayment}
         />
       )}
     </div>
