@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { mockDashboardMetrics, mockActivities, mockUsers, mockMensalidades, mockClients, mockFiliais } from '@/data/mock';
+import { mockActivities } from '@/data/mock';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/components/ui/notification-system';
 import ActionHistory, { ActionRecord } from '@/components/ui/action-history';
@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { RevenueByFilialChart } from '@/components/dashboard/RevenueByFilialChart';
 import { InadimplenciaAnalysis } from '@/components/dashboard/InadimplenciaAnalysis';
 import { FinancialProjections } from '@/components/dashboard/FinancialProjections';
-import { loadOrInit } from '@/services/storage';
+import { useAppStore } from '@/stores/useAppStore';
 
 // Mock data for enhanced charts
 const paymentData = [
@@ -66,7 +66,7 @@ const mockActionHistory: ActionRecord[] = [
     details: 'Mensalidade de Janeiro - AOA 5.000',
     userId: '1',
     userName: 'Admin Sistema',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
+    timestamp: new Date(Date.now() - 1000 * 60 * 30),
     entityId: 'client-1',
     entityType: 'payment'
   },
@@ -78,7 +78,7 @@ const mockActionHistory: ActionRecord[] = [
     details: 'Plano Premium - Filial Centro',
     userId: '2',
     userName: 'Carlos Mendes',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
     entityId: 'client-2',
     entityType: 'client'
   },
@@ -90,7 +90,7 @@ const mockActionHistory: ActionRecord[] = [
     details: 'Formato PDF - Período: Dezembro 2024',
     userId: '1',
     userName: 'Admin Sistema',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4),
   },
   {
     id: '4',
@@ -100,7 +100,7 @@ const mockActionHistory: ActionRecord[] = [
     details: 'Cliente: Pedro Costa - Motivo: Inadimplência',
     userId: '3',
     userName: 'Ana Ferreira',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6),
     entityId: 'client-3',
     entityType: 'client'
   },
@@ -150,30 +150,18 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
-  const [clients, setClients] = useState<Client[]>([]);
-  const [mensalidades, setMensalidades] = useState<Mensalidade[]>([]);
-  const [filiais, setFiliais] = useState<Filial[]>([]);
+  
+  // Use Zustand store
+  const { clients, mensalidades, filiais, setMensalidades } = useAppStore();
+  
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
   const currentMonth = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
 
-  // Load data from storage
-  useEffect(() => {
-    const loadedClients = loadOrInit<Client[]>('clients', mockClients);
-    const loadedMensalidades = loadOrInit<Mensalidade[]>('mensalidades', mockMensalidades);
-    const loadedFiliais = loadOrInit<Filial[]>('filiais', mockFiliais);
-    
-    setClients(loadedClients);
-    setMensalidades(loadedMensalidades);
-    setFiliais(loadedFiliais);
-  }, []);
-
   const handlePayment = (mensalidadeIds: string[]) => {
-    // Separate existing IDs from virtual/future ones
     const existingIds = mensalidadeIds.filter(id => !id.startsWith('virtual-'));
     const virtualIds = mensalidadeIds.filter(id => id.startsWith('virtual-'));
     
-    // Create new mensalidades for virtual/future months
     const newMensalidades: Mensalidade[] = virtualIds.map(id => {
       const parts = id.split('-');
       const clientId = parts.slice(1, -2).join('-');
@@ -196,15 +184,16 @@ export default function Dashboard() {
       };
     });
     
-    // Update state
-    setMensalidades(prev => [
-      ...prev.map(m =>
+    const updatedMensalidades = [
+      ...mensalidades.map(m =>
         existingIds.includes(m.id)
           ? { ...m, status: 'pago' as const, paidAt: new Date() }
           : m
       ),
       ...newMensalidades
-    ]);
+    ];
+    
+    setMensalidades(updatedMensalidades);
     
     toast({
       title: 'Pagamento registrado',
@@ -214,7 +203,6 @@ export default function Dashboard() {
     setSelectedClientForPayment(null);
   };
   
-  // Filter data based on user role and filial
   const userFilials = user?.role === 'admin' 
     ? filiais 
     : filiais.filter(f => f.id === user?.filialId);
@@ -223,7 +211,6 @@ export default function Dashboard() {
     ? clients 
     : clients.filter(c => c.filialId === user?.filialId);
 
-  // Calculate critical clients
   const criticalClients = userFilialClients
     .map(client => {
       const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
@@ -242,7 +229,6 @@ export default function Dashboard() {
     return status.status === 'kilapeiro';
   }).length;
 
-  // Calculate metrics
   const metrics = {
     totalClients: userFilialClients.length,
     activeClients: userFilialClients.filter(c => c.status === 'ativo').length,
@@ -422,7 +408,6 @@ export default function Dashboard() {
 
         <TabsContent value="overview" className="space-y-4 sm:space-y-6">
           <div className="grid gap-4 sm:gap-6 lg:grid-cols-7">
-            {/* Main Chart */}
             <Card className="lg:col-span-4 border-0 shadow-primary">
               <CardHeader>
                 <CardTitle>Receita vs Meta</CardTitle>
@@ -459,40 +444,30 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Action History */}
             <Card className="lg:col-span-3 border-0 shadow-primary">
               <CardHeader>
-                <CardTitle>Atividades Recentes</CardTitle>
+                <CardTitle>Ações Recentes</CardTitle>
                 <CardDescription>
-                  Últimas ações realizadas no sistema
+                  Últimas atividades no sistema
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ActionHistory 
-                  actions={mockActionHistory} 
-                  showFilters={false}
-                  maxHeight="300px"
-                  compact={true}
-                />
+                <ActionHistory actions={mockActionHistory} maxItems={4} />
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
         <TabsContent value="financial" className="space-y-4 sm:space-y-6">
-          {/* Financial Projections */}
-          <FinancialProjections filiais={filiais} clients={clients} mensalidades={mensalidades} />
-
-          {/* Revenue by Filial */}
-          <RevenueByFilialChart filiais={filiais} clients={clients} mensalidades={mensalidades} />
-
-          {/* Inadimplência Analysis */}
-          <InadimplenciaAnalysis filiais={filiais} clients={clients} mensalidades={mensalidades} />
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+            <RevenueByFilialChart filiais={filiais} clients={clients} mensalidades={mensalidades} />
+            <FinancialProjections filiais={filiais} clients={clients} mensalidades={mensalidades} />
+          </div>
         </TabsContent>
 
         <TabsContent value="payments" className="space-y-4 sm:space-y-6">
-          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
-            <Card className="border-0 shadow-primary">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-7">
+            <Card className="lg:col-span-4 border-0 shadow-primary">
               <CardHeader>
                 <CardTitle>Status de Pagamentos</CardTitle>
                 <CardDescription>
@@ -506,76 +481,61 @@ export default function Dashboard() {
                     <XAxis dataKey="month" />
                     <YAxis />
                     <Tooltip />
-                    <Bar dataKey="pago" fill="hsl(var(--primary))" name="Pagos" />
-                    <Bar dataKey="atrasado" fill="hsl(var(--destructive))" name="Atrasados" />
-                    <Bar dataKey="pendente" fill="hsl(var(--warning))" name="Pendentes" />
+                    <Legend />
+                    <Bar dataKey="pago" fill="hsl(var(--primary))" name="Pago" />
+                    <Bar dataKey="atrasado" fill="hsl(var(--destructive))" name="Atrasado" />
+                    <Bar dataKey="pendente" fill="hsl(var(--warning))" name="Pendente" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-primary">
+            <Card className="lg:col-span-3 border-0 shadow-primary">
               <CardHeader>
-                <CardTitle>Tendência de Inadimplência</CardTitle>
+                <CardTitle>Análise de Inadimplência</CardTitle>
                 <CardDescription>
-                  Evolução da taxa de inadimplência ao longo do tempo
+                  Detalhamento por filial
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={paymentData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line 
-                      type="monotone" 
-                      dataKey="atrasado" 
-                      stroke="hsl(var(--destructive))" 
-                      strokeWidth={3}
-                      name="Atrasados"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <InadimplenciaAnalysis filiais={filiais} clients={clients} mensalidades={mensalidades} />
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="growth" className="space-y-6">
+        <TabsContent value="growth" className="space-y-4 sm:space-y-6">
           <Card className="border-0 shadow-primary">
             <CardHeader>
               <CardTitle>Crescimento de Clientes</CardTitle>
               <CardDescription>
-                Evolução do número de clientes e taxa de crescimento mensal
+                Evolução da base de clientes ao longo do tempo
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <AreaChart data={growthData}>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={growthData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis yAxisId="left" />
                   <YAxis yAxisId="right" orientation="right" />
                   <Tooltip />
-                  <Area 
+                  <Legend />
+                  <Line 
                     yAxisId="left"
                     type="monotone" 
                     dataKey="clientes" 
                     stroke="hsl(var(--primary))" 
-                    fill="hsl(var(--primary))" 
-                    fillOpacity={0.3}
-                    name="Total Clientes"
+                    name="Total de Clientes"
                   />
                   <Line 
                     yAxisId="right"
                     type="monotone" 
                     dataKey="crescimento" 
-                    stroke="hsl(var(--secondary))" 
-                    strokeWidth={3}
-                    name="Crescimento %"
+                    stroke="hsl(var(--success))" 
+                    name="Crescimento (%)"
                   />
-                </AreaChart>
+                </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -587,21 +547,21 @@ export default function Dashboard() {
               <CardHeader>
                 <CardTitle>Distribuição por Status</CardTitle>
                 <CardDescription>
-                  Proporção de clientes por status atual
+                  Status atual dos clientes
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
+                <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
                       data={statusDistribution}
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
+                      outerRadius={100}
                       fill="#8884d8"
                       dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
                       {statusDistribution.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -616,42 +576,49 @@ export default function Dashboard() {
 
             <Card className="border-0 shadow-primary">
               <CardHeader>
-                <CardTitle>Métricas Rápidas</CardTitle>
+                <CardTitle>Resumo do Mês</CardTitle>
                 <CardDescription>
-                  Indicadores importantes do mês atual
+                  {currentMonth}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Ticket Médio</p>
-                    <p className="text-lg font-semibold">AOA 5.250</p>
+                <div className="flex items-center justify-between p-4 rounded-lg bg-primary/10">
+                  <div className="flex items-center gap-3">
+                    <DollarSign className="w-8 h-8 text-primary" />
+                    <div>
+                      <p className="font-medium">Receita Esperada</p>
+                      <p className="text-sm text-muted-foreground">Base de clientes ativos</p>
+                    </div>
                   </div>
-                  <DollarSign className="w-8 h-8 text-primary" />
+                  <p className="text-2xl font-bold">
+                    {(metrics.activeClients * 5000).toLocaleString()} AOA
+                  </p>
                 </div>
                 
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Novos Clientes</p>
-                    <p className="text-lg font-semibold">+15</p>
+                <div className="flex items-center justify-between p-4 rounded-lg bg-success/10">
+                  <div className="flex items-center gap-3">
+                    <CreditCard className="w-8 h-8 text-success" />
+                    <div>
+                      <p className="font-medium">Já Recebido</p>
+                      <p className="text-sm text-muted-foreground">Pagamentos confirmados</p>
+                    </div>
                   </div>
-                  <UserCheck className="w-8 h-8 text-green-600" />
+                  <p className="text-2xl font-bold text-success">
+                    {(metrics.monthlyPaid * 5000).toLocaleString()} AOA
+                  </p>
                 </div>
-                
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Taxa Conversão</p>
-                    <p className="text-lg font-semibold">87.3%</p>
+
+                <div className="flex items-center justify-between p-4 rounded-lg bg-destructive/10">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="w-8 h-8 text-destructive" />
+                    <div>
+                      <p className="font-medium">Em Atraso</p>
+                      <p className="text-sm text-muted-foreground">Valores pendentes</p>
+                    </div>
                   </div>
-                  <TrendingUp className="w-8 h-8 text-blue-600" />
-                </div>
-                
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Churn Rate</p>
-                    <p className="text-lg font-semibold">2.1%</p>
-                  </div>
-                  <TrendingDown className="w-8 h-8 text-orange-600" />
+                  <p className="text-2xl font-bold text-destructive">
+                    {(totalOverdueClients * 5000).toLocaleString()} AOA
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -659,53 +626,18 @@ export default function Dashboard() {
         </TabsContent>
       </Tabs>
 
-      {/* Filiais Overview (only for admin) */}
-      {user?.role === 'admin' && (
-        <Card className="border-0 shadow-primary">
-          <CardHeader>
-            <CardTitle>Visão Geral das Filiais</CardTitle>
-            <CardDescription>
-              Status e performance das filiais da ALF Chitumba
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {mockFiliais.map((filial) => {
-                const filialClients = mockClients.filter(c => c.filialId === filial.id);
-                const activeClients = filialClients.filter(c => c.status === 'ativo').length;
-                
-                return (
-                  <div key={filial.id} className="p-4 rounded-lg border bg-card">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-medium">{filial.name}</h3>
-                      <Badge variant={filial.status === 'ativa' ? 'default' : 'secondary'}>
-                        {filial.status}
-                      </Badge>
-                    </div>
-                    <div className="space-y-1 text-sm text-muted-foreground">
-                      <p>{filialClients.length} clientes total</p>
-                      <p>{activeClients} clientes ativos</p>
-                      <p className="font-medium text-foreground">{filial.responsavel}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Quick Payment Modal */}
+      {/* Payment Modal */}
       {selectedClientForPayment && (
         <QuickPaymentModal
-          open={isPaymentModalOpen}
+          client={selectedClientForPayment}
+          mensalidades={mensalidades.filter(m => m.clientId === selectedClientForPayment.id)}
+          filial={filiais.find(f => f.id === selectedClientForPayment.filialId)}
+          isOpen={isPaymentModalOpen}
           onClose={() => {
             setIsPaymentModalOpen(false);
             setSelectedClientForPayment(null);
           }}
-          client={selectedClientForPayment}
-          mensalidades={mensalidades}
-          onPayment={handlePayment}
+          onConfirm={handlePayment}
         />
       )}
     </div>

@@ -22,47 +22,19 @@ import {
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { mockClients, mockMensalidades, mockFiliais } from "@/data/mock";
 import { exportToExcel, exportToPDF, ExportColumn } from "@/utils/export";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Client, Mensalidade, Filial } from "@/types";
-import { loadOrInit } from "@/services/storage";
+import { useAppStore } from "@/stores/useAppStore";
 
 export default function Relatorios() {
   const { user } = useAuth();
+  const { clients, mensalidades, filiais } = useAppStore();
+  
   const [selectedPeriod, setSelectedPeriod] = useState('3months');
   const [selectedFilial, setSelectedFilial] = useState('all');
   const { toast } = useToast();
-  const [clients, setClients] = useState<Client[]>([]);
-  const [mensalidades, setMensalidades] = useState<Mensalidade[]>([]);
-  const [filiais, setFiliais] = useState<Filial[]>([]);
-
-  // Load data from storage
-  useEffect(() => {
-    const reviveClientDates = (data: Client[]) => data.map(c => ({ 
-      ...c, 
-      createdAt: new Date(c.createdAt as any)
-    }));
-    const reviveMensalidadeDates = (data: Mensalidade[]) => data.map(m => ({ 
-      ...m, 
-      dueDate: new Date(m.dueDate as any),
-      paidAt: m.paidAt ? new Date(m.paidAt as any) : undefined
-    }));
-    const reviveFilialDates = (data: Filial[]) => data.map(f => ({ 
-      ...f, 
-      createdAt: new Date(f.createdAt as any)
-    }));
-
-    const loadedClients = reviveClientDates(loadOrInit<Client[]>('clients', mockClients));
-    const loadedMensalidades = reviveMensalidadeDates(loadOrInit<Mensalidade[]>('mensalidades', mockMensalidades));
-    const loadedFiliais = reviveFilialDates(loadOrInit<Filial[]>('filiais', mockFiliais));
-    
-    setClients(loadedClients);
-    setMensalidades(loadedMensalidades);
-    setFiliais(loadedFiliais);
-  }, []);
 
   // Filter data based on user role
   const availableFiliais = user?.role === 'admin' 
