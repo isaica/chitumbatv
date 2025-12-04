@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,9 +9,11 @@ import { mockFiliais } from '@/data/mock';
 import { Filial } from '@/types';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { Save } from 'lucide-react';
+import { loadOrInit, set as storageSet } from '@/services/storage';
 
 export default function PrecosPorFilial() {
-  const [filiais, setFiliais] = useState<Filial[]>(mockFiliais);
+  const reviveDates = (data: Filial[]) => data.map(f => ({ ...f, createdAt: new Date(f.createdAt as any) }));
+  const [filiais, setFiliais] = useState<Filial[]>(reviveDates(loadOrInit('filiais', mockFiliais)));
   const { toast } = useToast();
 
   const handlePriceChange = (filialId: string, newPrice: number) => {
@@ -21,6 +23,7 @@ export default function PrecosPorFilial() {
   };
 
   const handleSave = () => {
+    storageSet('filiais', filiais);
     toast({
       title: 'Preços atualizados',
       description: 'Os preços das mensalidades foram atualizados com sucesso.',

@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Search, Edit, Trash2, MoreHorizontal, UserCog, Shield, Eye, EyeOff, UserCheck, UserX } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, MoreHorizontal, UserCog, Shield, Eye, EyeOff, UserCheck, UserX, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,7 +17,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { mockUsers, mockFiliais } from '@/data/mock';
 import { loadOrInit, set as storageSet } from '@/services/storage';
-import { User } from '@/types';
+import { User, Filial } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
 import { NoUsers, NoSearchResults } from '@/components/ui/empty-states';
@@ -37,12 +38,17 @@ type UserFormData = z.infer<typeof userSchema>;
 export default function Usuarios() {
   const { user: currentUser } = useAuth();
   const reviveUsers = (data: User[]) => data.map(u => ({ ...u, createdAt: new Date(u.createdAt as any) }));
+  const reviveFiliais = (data: Filial[]) => data.map(f => ({ ...f, createdAt: new Date(f.createdAt as any) }));
+  
   const [users, setUsers] = useState<User[]>(reviveUsers(loadOrInit('usuarios', mockUsers)));
+  const [filiais, setFiliais] = useState<Filial[]>(reviveFiliais(loadOrInit('filiais', mockFiliais)));
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'gerente' | 'funcionario'>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const { toast } = useToast();
 
   const {
@@ -83,7 +89,7 @@ export default function Usuarios() {
 
   const getFilialName = (filialId?: string) => {
     if (!filialId) return 'Todas as filiais';
-    return mockFiliais.find(f => f.id === filialId)?.name || 'N/A';
+    return filiais.find(f => f.id === filialId)?.name || 'N/A';
   };
 
   const getRoleColor = (role: string) => {
@@ -129,7 +135,7 @@ export default function Usuarios() {
       setValue('role', user.role);
       setValue('filialId', user.filialId);
       setValue('isActive', user.isActive);
-      setValue('password', ''); // Don't prefill password
+      setValue('password', '');
     } else {
       setEditingUser(null);
       reset();
@@ -145,7 +151,6 @@ export default function Usuarios() {
 
   const onSubmit = (data: UserFormData) => {
     if (editingUser) {
-      // Update existing user
       setUsers(prev => prev.map(u => 
         u.id === editingUser.id 
           ? { 
@@ -165,7 +170,6 @@ export default function Usuarios() {
         description: 'Os dados do usuário foram atualizados com sucesso.',
       });
     } else {
-      // Create new user
       const newUser: User = {
         id: Date.now().toString(),
         name: data.name,
@@ -186,7 +190,7 @@ export default function Usuarios() {
     handleCloseDialog();
   };
 
-  const handleDelete = (user: User) => {
+  const handleDeleteClick = (user: User) => {
     if (user.id === currentUser?.id) {
       toast({
         title: 'Não é possível excluir',
@@ -195,12 +199,20 @@ export default function Usuarios() {
       });
       return;
     }
+    setUserToDelete(user);
+    setDeleteDialogOpen(true);
+  };
 
-    setUsers(prev => prev.filter(u => u.id !== user.id));
+  const handleConfirmDelete = () => {
+    if (!userToDelete) return;
+    
+    setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
     toast({
       title: 'Usuário excluído',
       description: 'O usuário foi removido com sucesso.',
     });
+    setDeleteDialogOpen(false);
+    setUserToDelete(null);
   };
 
   const toggleUserStatus = (userId: string) => {
@@ -215,22 +227,29 @@ export default function Usuarios() {
     });
   };
 
+  // Summary metrics
+  const totalUsers = users.length;
+  const activeUsers = users.filter(u => u.isActive).length;
+  const adminCount = users.filter(u => u.role === 'admin').length;
+  const gerenteCount = users.filter(u => u.role === 'gerente').length;
+  const funcionarioCount = users.filter(u => u.role === 'funcionario').length;
+
   // Check if current user can manage users
   const canManageUsers = currentUser?.role === 'admin' || currentUser?.role === 'gerente';
 
   if (!canManageUsers) {
-  const [newPassword, setNewPassword] = useState('');
-  const changeOwnPassword = () => {
-    if (!currentUser || newPassword.length < 6) return;
-    setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, password: newPassword } : u));
-    setNewPassword('');
-    toast({ title: 'Senha atualizada', description: 'Sua senha foi alterada com sucesso.' });
-  };
-  return (
-    <div className="space-y-6">
-      <Breadcrumbs />
-      <div>
-        <h1 className="text-3xl font-bold text-gradient">Meu Perfil</h1>
+    const [newPassword, setNewPassword] = useState('');
+    const changeOwnPassword = () => {
+      if (!currentUser || newPassword.length < 6) return;
+      setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, password: newPassword } : u));
+      setNewPassword('');
+      toast({ title: 'Senha atualizada', description: 'Sua senha foi alterada com sucesso.' });
+    };
+    return (
+      <div className="space-y-6">
+        <Breadcrumbs />
+        <div>
+          <h1 className="text-3xl font-bold text-gradient">Meu Perfil</h1>
           <p className="text-muted-foreground">
             Visualize suas informações de usuário
           </p>
@@ -416,7 +435,7 @@ export default function Usuarios() {
                           <SelectValue placeholder="Selecione a filial" />
                         </SelectTrigger>
                         <SelectContent>
-                          {mockFiliais.map((filial) => (
+                          {filiais.map((filial) => (
                             <SelectItem key={filial.id} value={filial.id}>
                               {filial.name}
                             </SelectItem>
@@ -439,6 +458,59 @@ export default function Usuarios() {
             </DialogContent>
           </Dialog>
         )}
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <Card className="gradient-card border-0 shadow-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
+            <Users className="w-4 h-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalUsers}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="gradient-card border-0 shadow-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Usuários Ativos</CardTitle>
+            <UserCheck className="w-4 h-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">{activeUsers}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="gradient-card border-0 shadow-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Administradores</CardTitle>
+            <Shield className="w-4 h-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{adminCount}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="gradient-card border-0 shadow-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Gerentes</CardTitle>
+            <UserCog className="w-4 h-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{gerenteCount}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="gradient-card border-0 shadow-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Funcionários</CardTitle>
+            <UserCog className="w-4 h-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{funcionarioCount}</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
@@ -477,7 +549,7 @@ export default function Usuarios() {
         searchTerm || roleFilter !== 'all' ? (
           <NoSearchResults searchTerm={searchTerm} onClear={clearSearch} />
         ) : (
-          <NoUsers onCreate={currentUser?.role === 'admin' ? () => handleOpenDialog() : undefined} />
+          <NoUsers onCreate={() => handleOpenDialog()} />
         )
       ) : (
         <PaginationWrapper data={filteredUsers} itemsPerPage={10}>
@@ -489,7 +561,7 @@ export default function Usuarios() {
                     Usuários ({paginationInfo.totalItems})
                   </CardTitle>
                   <CardDescription>
-                    Lista de usuários do sistema
+                    Lista de todos os usuários do sistema
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -497,8 +569,6 @@ export default function Usuarios() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Usuário</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Telefone</TableHead>
                         <TableHead>Função</TableHead>
                         <TableHead>Filial</TableHead>
                         <TableHead>Status</TableHead>
@@ -510,28 +580,22 @@ export default function Usuarios() {
                         <TableRow key={user.id}>
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <Avatar className="w-8 h-8">
-                                <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                              <Avatar>
+                                <AvatarFallback className="bg-primary/10 text-primary">
                                   {getInitials(user.name)}
                                 </AvatarFallback>
                               </Avatar>
                               <div>
                                 <div className="font-medium">{user.name}</div>
-                                <div className="text-sm text-muted-foreground">
-                                  Criado em {user.createdAt.toLocaleDateString('pt-AO')}
-                                </div>
+                                <div className="text-sm text-muted-foreground">{user.email}</div>
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell>{user.email}</TableCell>
-                          <TableCell>{user.phone || '-'}</TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
+                            <Badge variant={getRoleColor(user.role)} className="flex items-center gap-1 w-fit">
                               {getRoleIcon(user.role)}
-                              <Badge variant={getRoleColor(user.role)}>
-                                {user.role}
-                              </Badge>
-                            </div>
+                              {user.role}
+                            </Badge>
                           </TableCell>
                           <TableCell>{getFilialName(user.filialId)}</TableCell>
                           <TableCell>
@@ -548,33 +612,32 @@ export default function Usuarios() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 {currentUser?.role === 'admin' && (
-                                  <>
-                                    <DropdownMenuItem onClick={() => handleOpenDialog(user)}>
-                                      <Edit className="w-4 h-4 mr-2" />
-                                      Editar
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => toggleUserStatus(user.id)}>
-                                      {user.isActive ? (
-                                        <>
-                                          <UserX className="w-4 h-4 mr-2" />
-                                          Desativar
-                                        </>
-                                      ) : (
-                                        <>
-                                          <UserCheck className="w-4 h-4 mr-2" />
-                                          Ativar
-                                        </>
-                                      )}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem 
-                                      className="text-destructive"
-                                      onClick={() => handleDelete(user)}
-                                      disabled={user.id === currentUser?.id}
-                                    >
-                                      <Trash2 className="w-4 h-4 mr-2" />
-                                      Excluir
-                                    </DropdownMenuItem>
-                                  </>
+                                  <DropdownMenuItem onClick={() => handleOpenDialog(user)}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Editar
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem onClick={() => toggleUserStatus(user.id)}>
+                                  {user.isActive ? (
+                                    <>
+                                      <UserX className="w-4 h-4 mr-2" />
+                                      Desativar
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserCheck className="w-4 h-4 mr-2" />
+                                      Ativar
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                                {currentUser?.role === 'admin' && (
+                                  <DropdownMenuItem 
+                                    className="text-destructive"
+                                    onClick={() => handleDeleteClick(user)}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Excluir
+                                  </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -590,6 +653,25 @@ export default function Usuarios() {
           )}
         </PaginationWrapper>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o usuário "{userToDelete?.name}"? 
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

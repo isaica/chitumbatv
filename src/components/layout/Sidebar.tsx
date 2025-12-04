@@ -27,6 +27,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { mockClients, mockMensalidades } from '@/data/mock';
 import { calculateClientPaymentStatus } from '@/utils/paymentStatus';
 import { Badge } from '@/components/ui/badge';
+import { loadOrInit } from '@/services/storage';
+import { Client, Mensalidade } from '@/types';
 
 const menuItems = [
   {
@@ -75,14 +77,18 @@ export function AppSidebar() {
   const currentPath = location.pathname;
   const collapsed = !open;
 
+  // Load data from storage
+  const clients = loadOrInit<Client[]>('clients', mockClients);
+  const mensalidades = loadOrInit<Mensalidade[]>('mensalidades', mockMensalidades);
+
   // Calculate badges
   const userFilialClients = user?.role === 'admin' 
-    ? mockClients 
-    : mockClients.filter(c => c.filialId === user?.filialId);
+    ? clients 
+    : clients.filter(c => c.filialId === user?.filialId);
 
   // Count clients with payment issues (Kilapeiros)
   const clientsWithIssues = userFilialClients.filter(client => {
-    const clientMensalidades = mockMensalidades.filter(m => m.clientId === client.id);
+    const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
     const status = calculateClientPaymentStatus(client, clientMensalidades);
     return status.status === 'kilapeiro';
   }).length;

@@ -1,23 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Search, Edit, Trash2, Building2, MoreHorizontal } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Building2, MoreHorizontal, Users, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { mockFiliais, mockClients } from '@/data/mock';
-import { Filial } from '@/types';
+import { Filial, Client } from '@/types';
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
 import { NoFiliais, NoSearchResults } from '@/components/ui/empty-states';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
+import { loadOrInit, set as storageSet } from '@/services/storage';
 
 const filialSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -32,11 +34,15 @@ const filialSchema = z.object({
 type FilialFormData = z.infer<typeof filialSchema>;
 
 export default function Filiais() {
-  const [filiais, setFiliais] = useState<Filial[]>(mockFiliais);
+  const reviveDates = (data: Filial[]) => data.map(f => ({ ...f, createdAt: new Date(f.createdAt as any) }));
+  const [filiais, setFiliais] = useState<Filial[]>(reviveDates(loadOrInit('filiais', mockFiliais)));
+  const [clients, setClients] = useState<Client[]>(loadOrInit('clients', mockClients));
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'ativa' | 'inativa'>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingFilial, setEditingFilial] = useState<Filial | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [filialToDelete, setFilialToDelete] = useState<Filial | null>(null);
   const { toast } = useToast();
 
   const {
@@ -52,6 +58,11 @@ export default function Filiais() {
     },
   });
 
+  // Persist filiais changes
+  useEffect(() => {
+    storageSet('filiais', filiais);
+  }, [filiais]);
+
   const filteredFiliais = filiais.filter((filial) => {
     const matchesSearch = filial.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          filial.responsavel.toLowerCase().includes(searchTerm.toLowerCase());
@@ -60,8 +71,14 @@ export default function Filiais() {
   });
 
   const getClientCount = (filialId: string) => {
-    return mockClients.filter(client => client.filialId === filialId).length;
+    return clients.filter(client => client.filialId === filialId).length;
   };
+
+  // Summary metrics
+  const totalFiliais = filiais.length;
+  const activeFiliais = filiais.filter(f => f.status === 'ativa').length;
+  const inactiveFiliais = filiais.filter(f => f.status === 'inativa').length;
+  const totalClients = clients.length;
 
   const handleOpenDialog = (filial?: Filial) => {
     if (filial) {
@@ -86,7 +103,6 @@ export default function Filiais() {
 
   const onSubmit = (data: FilialFormData) => {
     if (editingFilial) {
-      // Update existing filial
       setFiliais(prev => prev.map(f => 
         f.id === editingFilial.id 
           ? { ...f, ...data }
@@ -97,7 +113,6 @@ export default function Filiais() {
         description: 'Os dados da filial foram atualizados com sucesso.',
       });
     } else {
-      // Create new filial
       const newFilial: Filial = {
         id: Date.now().toString(),
         name: data.name,
@@ -118,22 +133,33 @@ export default function Filiais() {
     handleCloseDialog();
   };
 
-  const handleDelete = (filial: Filial) => {
-    const clientCount = getClientCount(filial.id);
+  const handleDeleteClick = (filial: Filial) => {
+    setFilialToDelete(filial);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!filialToDelete) return;
+
+    const clientCount = getClientCount(filialToDelete.id);
     if (clientCount > 0) {
       toast({
         title: 'Não é possível excluir',
         description: `Esta filial possui ${clientCount} cliente(s) associado(s).`,
         variant: 'destructive',
       });
+      setDeleteDialogOpen(false);
+      setFilialToDelete(null);
       return;
     }
 
-    setFiliais(prev => prev.filter(f => f.id !== filial.id));
+    setFiliais(prev => prev.filter(f => f.id !== filialToDelete.id));
     toast({
       title: 'Filial excluída',
       description: 'A filial foi removida com sucesso.',
     });
+    setDeleteDialogOpen(false);
+    setFilialToDelete(null);
   };
 
   const clearSearch = () => {
@@ -284,6 +310,49 @@ export default function Filiais() {
         </Dialog>
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="gradient-card border-0 shadow-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Filiais</CardTitle>
+            <Building2 className="w-4 h-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalFiliais}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="gradient-card border-0 shadow-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Filiais Ativas</CardTitle>
+            <CheckCircle className="w-4 h-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">{activeFiliais}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="gradient-card border-0 shadow-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Filiais Inativas</CardTitle>
+            <XCircle className="w-4 h-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-muted-foreground">{inactiveFiliais}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="gradient-card border-0 shadow-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>
+            <Users className="w-4 h-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalClients}</div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Filters */}
       <Card className="border-0 shadow-primary">
         <CardHeader>
@@ -386,7 +455,7 @@ export default function Filiais() {
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 className="text-destructive"
-                                onClick={() => handleDelete(filial)}
+                                onClick={() => handleDeleteClick(filial)}
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 Excluir
@@ -405,6 +474,25 @@ export default function Filiais() {
           )}
         </PaginationWrapper>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a filial "{filialToDelete?.name}"? 
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setFilialToDelete(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

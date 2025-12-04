@@ -1,17 +1,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Download, 
   TrendingUp, 
   TrendingDown,
   Users, 
-  DollarSign,
-  Calendar,
-  FileText,
   CreditCard,
-  AlertCircle,
-  CheckCircle
+  FileText
 } from "lucide-react";
 import { 
   BarChart, 
@@ -20,22 +15,16 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  Legend, 
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
-  Cell,
-  Area,
-  AreaChart
+  Cell
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { mockClients, mockMensalidades, mockFiliais } from "@/data/mock";
-import { exportToExcel, exportToPDF } from "@/utils/export";
+import { exportToExcel, exportToPDF, ExportColumn } from "@/utils/export";
 import { useState, useEffect } from "react";
-import { QuickPaymentModal } from "@/components/ui/quick-payment-modal";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Client, Mensalidade, Filial } from "@/types";
@@ -52,9 +41,23 @@ export default function Relatorios() {
 
   // Load data from storage
   useEffect(() => {
-    const loadedClients = loadOrInit<Client[]>('clients', mockClients);
-    const loadedMensalidades = loadOrInit<Mensalidade[]>('mensalidades', mockMensalidades);
-    const loadedFiliais = loadOrInit<Filial[]>('filiais', mockFiliais);
+    const reviveClientDates = (data: Client[]) => data.map(c => ({ 
+      ...c, 
+      createdAt: new Date(c.createdAt as any)
+    }));
+    const reviveMensalidadeDates = (data: Mensalidade[]) => data.map(m => ({ 
+      ...m, 
+      dueDate: new Date(m.dueDate as any),
+      paidAt: m.paidAt ? new Date(m.paidAt as any) : undefined
+    }));
+    const reviveFilialDates = (data: Filial[]) => data.map(f => ({ 
+      ...f, 
+      createdAt: new Date(f.createdAt as any)
+    }));
+
+    const loadedClients = reviveClientDates(loadOrInit<Client[]>('clients', mockClients));
+    const loadedMensalidades = reviveMensalidadeDates(loadOrInit<Mensalidade[]>('mensalidades', mockMensalidades));
+    const loadedFiliais = reviveFilialDates(loadOrInit<Filial[]>('filiais', mockFiliais));
     
     setClients(loadedClients);
     setMensalidades(loadedMensalidades);
@@ -132,7 +135,7 @@ export default function Relatorios() {
 
   const totalClients = statusDistribution.reduce((acc, item) => acc + item.value, 0);
   const activeClients = statusDistribution.find(item => item.name === 'Ativos')?.value || 0;
-  const suspendedClients = statusDistribution.find(item => item.name === 'Suspensos')?.value || 0;
+  const inactiveClients = statusDistribution.find(item => item.name === 'Inativos')?.value || 0;
 
   // Calculate current month metrics
   const currentMonth = new Date().getMonth() + 1;
@@ -142,10 +145,68 @@ export default function Relatorios() {
   );
 
   const handleExport = (type: 'pdf' | 'excel') => {
-    toast({
-      title: 'Exportação em desenvolvimento',
-      description: `A exportação para ${type.toUpperCase()} será implementada em breve.`,
+    // Filter data based on selected filial
+    const filteredClients = selectedFilial === 'all' 
+      ? userFilialClients
+      : userFilialClients.filter(c => c.filialId === selectedFilial);
+
+    // Prepare export data with client info and payment status
+    const exportData = filteredClients.map(client => {
+      const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
+      const pendingCount = clientMensalidades.filter(m => m.status === 'pendente' || m.status === 'atrasado').length;
+      const totalDebt = clientMensalidades
+        .filter(m => m.status === 'pendente' || m.status === 'atrasado')
+        .reduce((acc, m) => acc + m.amount, 0);
+      const filial = filiais.find(f => f.id === client.filialId);
+
+      return {
+        name: client.name,
+        email: client.email,
+        phone: client.phone,
+        filial: filial?.name || 'N/A',
+        status: client.status,
+        pendingMonths: pendingCount,
+        totalDebt: totalDebt,
+        createdAt: client.createdAt
+      };
     });
+
+    const columns: ExportColumn[] = [
+      { key: 'name', title: 'Nome', width: 40 },
+      { key: 'phone', title: 'Telefone', width: 25 },
+      { key: 'filial', title: 'Filial', width: 30 },
+      { key: 'status', title: 'Status', width: 15, format: (v) => v === 'ativo' ? 'Ativo' : 'Inativo' },
+      { key: 'pendingMonths', title: 'Meses Pendentes', width: 20 },
+      { key: 'totalDebt', title: 'Dívida Total (AOA)', width: 25, format: (v) => v.toLocaleString('pt-AO') },
+      { key: 'createdAt', title: 'Data Cadastro', width: 25, format: (v) => new Date(v).toLocaleDateString('pt-AO') }
+    ];
+
+    const filialName = selectedFilial === 'all' 
+      ? 'Todas as Filiais' 
+      : filiais.find(f => f.id === selectedFilial)?.name || '';
+
+    const options = {
+      filename: `relatorio_clientes_${new Date().toISOString().split('T')[0]}`,
+      title: 'Relatório de Clientes - ALF Chitumba',
+      subtitle: `Filial: ${filialName} | Período: ${selectedPeriod === '3months' ? 'Últimos 3 meses' : selectedPeriod === '6months' ? 'Últimos 6 meses' : 'Último ano'}`,
+      columns,
+      data: exportData,
+      orientation: 'landscape' as const
+    };
+
+    if (type === 'pdf') {
+      exportToPDF(options);
+      toast({
+        title: 'PDF Exportado',
+        description: 'O relatório foi exportado com sucesso.',
+      });
+    } else {
+      exportToExcel(options);
+      toast({
+        title: 'Excel Exportado',
+        description: 'O relatório foi exportado com sucesso.',
+      });
+    }
   };
 
   return (
@@ -193,7 +254,7 @@ export default function Relatorios() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as Filiais</SelectItem>
-                  {mockFiliais.map((filial) => (
+                  {filiais.map((filial) => (
                     <SelectItem key={filial.id} value={filial.id}>
                       {filial.name}
                     </SelectItem>
@@ -223,7 +284,7 @@ export default function Relatorios() {
         <Card className="gradient-card border-0 shadow-primary">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Taxa de Atividade</CardTitle>
-            <TrendingDown className="w-4 h-4 text-success" />
+            <TrendingUp className="w-4 h-4 text-success" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -237,11 +298,11 @@ export default function Relatorios() {
 
         <Card className="gradient-card border-0 shadow-primary">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Clientes Suspensos</CardTitle>
-            <TrendingDown className="w-4 h-4 text-destructive" />
+            <CardTitle className="text-sm font-medium">Clientes Inativos</CardTitle>
+            <TrendingDown className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{suspendedClients}</div>
+            <div className="text-2xl font-bold text-muted-foreground">{inactiveClients}</div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <span>precisam atenção</span>
             </div>
