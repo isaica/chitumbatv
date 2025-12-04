@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,12 +14,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { mockFiliais, mockClients } from '@/data/mock';
-import { Filial, Client } from '@/types';
+import { Filial } from '@/types';
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
 import { NoFiliais, NoSearchResults } from '@/components/ui/empty-states';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
-import { loadOrInit, set as storageSet } from '@/services/storage';
+import { useAppStore } from '@/stores/useAppStore';
 
 const filialSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -34,9 +33,8 @@ const filialSchema = z.object({
 type FilialFormData = z.infer<typeof filialSchema>;
 
 export default function Filiais() {
-  const reviveDates = (data: Filial[]) => data.map(f => ({ ...f, createdAt: new Date(f.createdAt as any) }));
-  const [filiais, setFiliais] = useState<Filial[]>(reviveDates(loadOrInit('filiais', mockFiliais)));
-  const [clients, setClients] = useState<Client[]>(loadOrInit('clients', mockClients));
+  const { filiais, clients, addFilial, updateFilial, deleteFilial } = useAppStore();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'ativa' | 'inativa'>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -57,11 +55,6 @@ export default function Filiais() {
       status: 'ativa',
     },
   });
-
-  // Persist filiais changes
-  useEffect(() => {
-    storageSet('filiais', filiais);
-  }, [filiais]);
 
   const filteredFiliais = filiais.filter((filial) => {
     const matchesSearch = filial.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -103,11 +96,7 @@ export default function Filiais() {
 
   const onSubmit = (data: FilialFormData) => {
     if (editingFilial) {
-      setFiliais(prev => prev.map(f => 
-        f.id === editingFilial.id 
-          ? { ...f, ...data }
-          : f
-      ));
+      updateFilial(editingFilial.id, data);
       toast({
         title: 'Filial atualizada',
         description: 'Os dados da filial foram atualizados com sucesso.',
@@ -124,7 +113,7 @@ export default function Filiais() {
         status: data.status,
         createdAt: new Date(),
       };
-      setFiliais(prev => [...prev, newFilial]);
+      addFilial(newFilial);
       toast({
         title: 'Filial criada',
         description: 'Nova filial foi adicionada com sucesso.',
@@ -153,7 +142,7 @@ export default function Filiais() {
       return;
     }
 
-    setFiliais(prev => prev.filter(f => f.id !== filialToDelete.id));
+    deleteFilial(filialToDelete.id);
     toast({
       title: 'Filial excluída',
       description: 'A filial foi removida com sucesso.',
@@ -454,8 +443,8 @@ export default function Filiais() {
                                 Editar
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                className="text-destructive"
                                 onClick={() => handleDeleteClick(filial)}
+                                className="text-destructive"
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 Excluir
@@ -470,29 +459,29 @@ export default function Filiais() {
               </CardContent>
             </Card>
             {paginationElement}
-            </div>
-          )}
-        </PaginationWrapper>
-      )}
+          </div>
+        )}
+      </PaginationWrapper>
+    )}
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir a filial "{filialToDelete?.name}"? 
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setFilialToDelete(null)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+    {/* Delete Confirmation Dialog */}
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja excluir a filial "{filialToDelete?.name}"? 
+            Esta ação não pode ser desfeita.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            Excluir
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </div>
   );
 }

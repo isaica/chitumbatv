@@ -1,13 +1,10 @@
-import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Building2,
   Users,
-  CreditCard,
   UserCog,
   BarChart3,
-  ChevronLeft,
   Tv,
   BadgeDollarSign
 } from 'lucide-react';
@@ -20,15 +17,12 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockClients, mockMensalidades } from '@/data/mock';
 import { calculateClientPaymentStatus } from '@/utils/paymentStatus';
 import { Badge } from '@/components/ui/badge';
-import { loadOrInit } from '@/services/storage';
-import { Client, Mensalidade } from '@/types';
+import { useAppStore } from '@/stores/useAppStore';
 
 const menuItems = [
   {
@@ -77,9 +71,8 @@ export function AppSidebar() {
   const currentPath = location.pathname;
   const collapsed = !open;
 
-  // Load data from storage
-  const clients = loadOrInit<Client[]>('clients', mockClients);
-  const mensalidades = loadOrInit<Mensalidade[]>('mensalidades', mockMensalidades);
+  // Use Zustand store for real-time data
+  const { clients, mensalidades } = useAppStore();
 
   // Calculate badges
   const userFilialClients = user?.role === 'admin' 
