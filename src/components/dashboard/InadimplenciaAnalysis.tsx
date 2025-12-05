@@ -56,7 +56,7 @@ export function InadimplenciaAnalysis({ filiais, clients, mensalidades }: Inadim
   // Overall status distribution
   const totalStatusDistribution = [
     { 
-      name: 'Em Dia', 
+      name: 'Pago', 
       value: inadimplenciaByFilial.reduce((sum, f) => sum + f.pago, 0),
       color: COLORS.pago
     },
@@ -100,7 +100,7 @@ export function InadimplenciaAnalysis({ filiais, clients, mensalidades }: Inadim
             <div className="grid grid-cols-3 gap-2">
               <div className="text-center p-3 bg-primary/10 rounded-lg">
                 <p className="text-2xl font-bold text-primary">{totalStatusDistribution[0].value}</p>
-                <p className="text-xs text-muted-foreground">Em Dia</p>
+                <p className="text-xs text-muted-foreground">Pago</p>
               </div>
               <div className="text-center p-3 bg-destructive/10 rounded-lg">
                 <p className="text-2xl font-bold text-destructive">{totalStatusDistribution[1].value}</p>
@@ -193,7 +193,7 @@ export function InadimplenciaAnalysis({ filiais, clients, mensalidades }: Inadim
                   
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>
-                      <p className="text-muted-foreground">Em Dia</p>
+                      <p className="text-muted-foreground">Pago</p>
                       <p className="font-semibold text-primary">{filial.pago}</p>
                     </div>
                     <div>

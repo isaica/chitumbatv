@@ -373,6 +373,25 @@ export default function Clientes() {
   };
 
   const handleExport = (format: 'pdf' | 'excel' | 'csv') => {
+    // Validação: só exportar se status específico estiver selecionado
+    if (statusFilter === 'all') {
+      toast({
+        title: 'Selecione um status',
+        description: 'Escolha Pago, Kilapeiros ou Inativos para exportar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const statusTitles: Record<string, string> = {
+      pago: 'Clientes Pago',
+      kilapeiro: 'Clientes Kilapeiros',
+      inativo: 'Clientes Inativos',
+    };
+
+    const dateStr = new Date().toLocaleDateString('pt-AO').replace(/\//g, '-');
+    const statusTitle = statusTitles[statusFilter] || 'Clientes';
+
     const exportData = filteredClients.map(client => ({
       name: client.name,
       phone: client.phone,
@@ -406,18 +425,17 @@ export default function Clientes() {
       { key: 'overdueMonths', title: 'Meses em Atraso', width: 20 },
     ];
 
-    let subtitle = 'Todos os clientes';
-    if (statusFilter !== 'all') {
-      subtitle = `Clientes ${getStatusLabel(statusFilter)}`;
-    }
+    let subtitle = statusTitle;
     if (filialFilter !== 'all') {
       const filialName = getFilialName(filialFilter);
       subtitle += ` - Filial ${filialName}`;
     }
 
+    const filename = `${statusTitle.replace(/ /g, '_')}_${dateStr}`;
+
     const options: ExportOptions = {
-      filename: `clientes_${statusFilter}_${new Date().toISOString().split('T')[0]}`,
-      title: 'Lista de Clientes - ALF Chitumba',
+      filename,
+      title: `${statusTitle} - ${dateStr}`,
       subtitle,
       columns,
       data: exportData,
@@ -676,7 +694,7 @@ export default function Clientes() {
         
         <Card className="gradient-card border-0 shadow-primary">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
-            <CardTitle className="text-xs sm:text-sm font-medium">Em Dia</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">Pago</CardTitle>
             <CheckCircle className="w-4 h-4 text-success" />
           </CardHeader>
           <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
@@ -731,7 +749,7 @@ export default function Clientes() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="pago">Em Dia</SelectItem>
+                  <SelectItem value="pago">Pago</SelectItem>
                   <SelectItem value="kilapeiro">Kilapeiros</SelectItem>
                   <SelectItem value="inativo">Inativos</SelectItem>
                 </SelectContent>
