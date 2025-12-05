@@ -250,7 +250,7 @@ export function ClientDetailsModal({
               {paymentStatus.status === 'pago' && (
                 <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
                   <CreditCard className="w-5 h-5 text-green-600" />
-                  <span className="text-green-700 font-medium">Todas as mensalidades em dia!</span>
+                  <span className="text-green-700 font-medium">Todas as mensalidades pagas!</span>
                 </div>
               )}
 

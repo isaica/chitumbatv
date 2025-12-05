@@ -46,7 +46,7 @@ export function GlobalSearch() {
     if (client?.status === 'inativo') return '🔴 Inativo';
     if (overdue >= 3) return '🔴 Crítico';
     if (overdue >= 1) return '⚠️ Atrasado';
-    return '✅ Em dia';
+    return '✅ Pago';
   };
 
   const search = (searchQuery: string): SearchResult[] => {

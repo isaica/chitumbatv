@@ -6,7 +6,8 @@ import {
   TrendingDown,
   Users, 
   CreditCard,
-  FileText
+  FileText,
+  DollarSign
 } from "lucide-react";
 import { 
   BarChart, 
@@ -27,10 +28,12 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppStore } from "@/stores/useAppStore";
+import { useNavigate } from "react-router-dom";
 
 export default function Relatorios() {
   const { user } = useAuth();
   const { clients, mensalidades, filiais } = useAppStore();
+  const navigate = useNavigate();
   
   const [selectedPeriod, setSelectedPeriod] = useState('3months');
   const [selectedFilial, setSelectedFilial] = useState('all');
@@ -191,6 +194,13 @@ export default function Relatorios() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            className="gradient-primary"
+            onClick={() => navigate('/clientes?status=kilapeiro')}
+          >
+            <DollarSign className="mr-2 h-4 w-4" />
+            Registrar Pagamentos
+          </Button>
           <Button variant="outline" onClick={() => handleExport('excel')}>
             <Download className="mr-2 h-4 w-4" />
             Excel

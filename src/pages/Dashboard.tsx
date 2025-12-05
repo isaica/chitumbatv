@@ -336,13 +336,26 @@ export default function Dashboard() {
                         </span>
                       </div>
                     </div>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => navigate('/clientes')}
-                    >
-                      Ver Detalhes
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        className="gradient-primary"
+                        onClick={() => {
+                          setSelectedClientForPayment(client);
+                          setIsPaymentModalOpen(true);
+                        }}
+                      >
+                        <CreditCard className="w-4 h-4 mr-1" />
+                        Pagar
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => navigate('/clientes')}
+                      >
+                        Ver Detalhes
+                      </Button>
+                    </div>
                   </div>
                 );
               })}
