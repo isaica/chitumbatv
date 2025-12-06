@@ -644,6 +644,7 @@ export default function Dashboard() {
         <QuickPaymentModal
           client={selectedClientForPayment}
           mensalidades={mensalidades.filter(m => m.clientId === selectedClientForPayment.id)}
+          filiais={filiais}
           open={isPaymentModalOpen}
           onClose={() => {
             setIsPaymentModalOpen(false);

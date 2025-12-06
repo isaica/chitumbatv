@@ -1,7 +1,8 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal, User, CreditCard, AlertCircle, DollarSign, Download, FileText, FileSpreadsheet, FileDown, Printer, Users, CheckCircle, XCircle, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +53,7 @@ export default function Clientes() {
   const { user } = useAuth();
   const { isMobile } = useResponsive();
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // Use Zustand store
   const { 
@@ -80,6 +82,14 @@ export default function Clientes() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   
   const { toast } = useToast();
+
+  // Read query params and apply filters
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    if (statusParam && ['pago', 'kilapeiro', 'inativo'].includes(statusParam)) {
+      setStatusFilter(statusParam as 'pago' | 'kilapeiro' | 'inativo');
+    }
+  }, [searchParams]);
 
   const {
     register,
@@ -261,7 +271,7 @@ export default function Clientes() {
   };
 
   const handleConfirmPayment = (mensalidadeIds: string[]) => {
-    const updatedMensalidades = confirmPayments(mensalidadeIds, clients, mensalidades);
+    const updatedMensalidades = confirmPayments(mensalidadeIds, clients, mensalidades, filiais);
     setMensalidades(updatedMensalidades);
     
     toast({
@@ -1013,6 +1023,7 @@ export default function Clientes() {
         <ClientDetailsModal
           client={detailsClient}
           mensalidades={mensalidades.filter(m => m.clientId === detailsClient.id)}
+          filiais={filiais}
           paymentStatus={calculateClientPaymentStatus(detailsClient, mensalidades.filter(m => m.clientId === detailsClient.id))}
           isOpen={isDetailsOpen}
           onClose={() => {
@@ -1030,6 +1041,7 @@ export default function Clientes() {
         <QuickPaymentModal
           client={paymentClient}
           mensalidades={mensalidades.filter(m => m.clientId === paymentClient.id)}
+          filiais={filiais}
           open={isPaymentModalOpen}
           onClose={() => {
             setIsPaymentModalOpen(false);

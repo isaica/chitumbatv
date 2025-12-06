@@ -8,9 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { User, MapPin, Phone, Mail, Calendar, CreditCard, AlertCircle, TrendingUp, CheckCircle2, XCircle, UserX, UserCheck } from 'lucide-react';
-import { Client, Mensalidade } from '@/types';
+import { Client, Mensalidade, Filial } from '@/types';
 import { ClientPaymentStatus, getStatusLabel, getStatusColor } from '@/utils/paymentStatus';
-import { mockFiliais } from '@/data/mock';
 import { useToast } from '@/hooks/use-toast';
 
 interface ClientDetailsModalProps {
@@ -19,6 +18,7 @@ interface ClientDetailsModalProps {
   onClose: () => void;
   paymentStatus: ClientPaymentStatus;
   mensalidades: Mensalidade[];
+  filiais: Filial[];
   onRegisterPayment?: (clientId: string) => void;
   onDeactivateClient?: (clientId: string, reason: string, technician: string) => void;
   onReactivateClient?: (clientId: string, reason: string, responsible: string) => void;
@@ -30,6 +30,7 @@ export function ClientDetailsModal({
   onClose,
   paymentStatus,
   mensalidades,
+  filiais,
   onRegisterPayment,
   onDeactivateClient,
   onReactivateClient
@@ -95,7 +96,7 @@ export function ClientDetailsModal({
     });
   };
 
-  const filial = mockFiliais.find(f => f.id === client.filialId);
+  const filial = filiais.find(f => f.id === client.filialId);
   const clientMensalidades = mensalidades
     .filter(m => m.clientId === client.id)
     .sort((a, b) => new Date(b.year, b.month - 1).getTime() - new Date(a.year, a.month - 1).getTime());

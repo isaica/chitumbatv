@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { mockClients, mockFiliais, mockMensalidades, mockUsers } from '@/data/mock';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppStore } from '@/stores/useAppStore';
+import { mockUsers } from '@/data/mock';
 
 interface SearchResult {
   id: string;
@@ -26,11 +27,14 @@ export function GlobalSearch() {
   const navigate = useNavigate();
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  // Use Zustand store for clients, filiais, and mensalidades
+  const { clients, filiais, mensalidades } = useAppStore();
 
   // Filter data based on user permissions
   const availableClients = user?.role === 'admin' 
-    ? mockClients 
-    : mockClients.filter(c => c.filialId === user?.filialId);
+    ? clients 
+    : clients.filter(c => c.filialId === user?.filialId);
   
   const availableUsers = user?.role === 'admin' 
     ? mockUsers 
@@ -39,9 +43,9 @@ export function GlobalSearch() {
     : [user].filter(Boolean);
 
   const calculateClientPaymentStatus = (clientId: string) => {
-    const clientMensalidades = mockMensalidades.filter(m => m.clientId === clientId);
+    const clientMensalidades = mensalidades.filter(m => m.clientId === clientId);
     const overdue = clientMensalidades.filter(m => m.status === 'atrasado').length;
-    const client = mockClients.find(c => c.id === clientId);
+    const client = clients.find(c => c.id === clientId);
     
     if (client?.status === 'inativo') return '🔴 Inativo';
     if (overdue >= 3) return '🔴 Crítico';
@@ -75,7 +79,7 @@ export function GlobalSearch() {
       );
 
       if (matchesText || matchesStatus || (isStatusSearch && client.status.includes(query.replace('status:', '').trim()))) {
-        const filial = mockFiliais.find(f => f.id === client.filialId);
+        const filial = filiais.find(f => f.id === client.filialId);
         results.push({
           id: client.id,
           title: `${client.name} ${paymentStatus}`,
@@ -89,12 +93,12 @@ export function GlobalSearch() {
 
     // Search filiais (admin only)
     if (user?.role === 'admin') {
-      mockFiliais.forEach(filial => {
+      filiais.forEach(filial => {
         if (
           filial.name.toLowerCase().includes(query) ||
           filial.responsavel.toLowerCase().includes(query)
         ) {
-          const clientCount = mockClients.filter(c => c.filialId === filial.id).length;
+          const clientCount = clients.filter(c => c.filialId === filial.id).length;
           results.push({
             id: filial.id,
             title: filial.name,
@@ -108,7 +112,7 @@ export function GlobalSearch() {
     }
 
     // Search mensalidades with enhanced filtering
-    const relevantMensalidades = mockMensalidades.filter(m => 
+    const relevantMensalidades = mensalidades.filter(m => 
       availableClients.some(c => c.id === m.clientId)
     );
     
@@ -146,7 +150,7 @@ export function GlobalSearch() {
           searchUser.name.toLowerCase().includes(query) ||
           searchUser.email.toLowerCase().includes(query)
         ) {
-          const filial = searchUser.filialId ? mockFiliais.find(f => f.id === searchUser.filialId) : null;
+          const filial = searchUser.filialId ? filiais.find(f => f.id === searchUser.filialId) : null;
           results.push({
             id: searchUser.id,
             title: searchUser.name,

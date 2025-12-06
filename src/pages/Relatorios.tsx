@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
@@ -7,7 +8,8 @@ import {
   Users, 
   CreditCard,
   FileText,
-  DollarSign
+  DollarSign,
+  AlertTriangle
 } from "lucide-react";
 import { 
   BarChart, 
@@ -24,19 +26,21 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { exportToExcel, exportToPDF, ExportColumn } from "@/utils/export";
-import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppStore } from "@/stores/useAppStore";
-import { useNavigate } from "react-router-dom";
+import { QuickPaymentModal } from "@/components/ui/quick-payment-modal";
+import { Client, Mensalidade } from "@/types";
+import { calculateClientPaymentStatus } from "@/utils/paymentStatus";
 
 export default function Relatorios() {
   const { user } = useAuth();
-  const { clients, mensalidades, filiais } = useAppStore();
-  const navigate = useNavigate();
+  const { clients, mensalidades, filiais, setMensalidades } = useAppStore();
   
   const [selectedPeriod, setSelectedPeriod] = useState('3months');
   const [selectedFilial, setSelectedFilial] = useState('all');
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
   const { toast } = useToast();
 
   // Filter data based on user role
@@ -47,6 +51,63 @@ export default function Relatorios() {
   const userFilialClients = user?.role === 'admin' 
     ? clients 
     : clients.filter(c => c.filialId === user?.filialId);
+
+  // Get kilapeiros (critical clients)
+  const kilapeiros = userFilialClients
+    .map(client => {
+      const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
+      const paymentStatus = calculateClientPaymentStatus(client, clientMensalidades);
+      return { client, paymentStatus };
+    })
+    .filter(({ paymentStatus }) => paymentStatus.status === 'kilapeiro')
+    .sort((a, b) => b.paymentStatus.overdueCount - a.paymentStatus.overdueCount)
+    .slice(0, 5);
+
+  // Handle payment
+  const handlePayment = (mensalidadeIds: string[]) => {
+    const existingIds = mensalidadeIds.filter(id => !id.startsWith('virtual-'));
+    const virtualIds = mensalidadeIds.filter(id => id.startsWith('virtual-'));
+    
+    const newMensalidades: Mensalidade[] = virtualIds.map(id => {
+      const parts = id.split('-');
+      const clientId = parts.slice(1, -2).join('-');
+      const year = parseInt(parts[parts.length - 2]);
+      const month = parseInt(parts[parts.length - 1]);
+      
+      const client = clients.find(c => c.id === clientId);
+      const filial = client ? filiais.find(f => f.id === client.filialId) : null;
+      
+      return {
+        id: `${clientId}-${year}-${month}-${Date.now()}`,
+        clientId,
+        month,
+        year,
+        amount: filial?.monthlyPrice || 0,
+        status: 'pago' as const,
+        dueDate: new Date(year, month - 1, 15),
+        paidAt: new Date(),
+        createdAt: new Date()
+      };
+    });
+    
+    const updatedMensalidades = [
+      ...mensalidades.map(m =>
+        existingIds.includes(m.id)
+          ? { ...m, status: 'pago' as const, paidAt: new Date() }
+          : m
+      ),
+      ...newMensalidades
+    ];
+    
+    setMensalidades(updatedMensalidades);
+    
+    toast({
+      title: 'Pagamento registrado',
+      description: `${mensalidadeIds.length} ${mensalidadeIds.length === 1 ? 'mensalidade paga' : 'mensalidades pagas'} com sucesso.`,
+    });
+    setIsPaymentModalOpen(false);
+    setSelectedClientForPayment(null);
+  };
 
   // Generate inadimplência data
   const getInadimplenciaData = () => {
@@ -194,13 +255,6 @@ export default function Relatorios() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            className="gradient-primary"
-            onClick={() => navigate('/clientes?status=kilapeiro')}
-          >
-            <DollarSign className="mr-2 h-4 w-4" />
-            Registrar Pagamentos
-          </Button>
           <Button variant="outline" onClick={() => handleExport('excel')}>
             <Download className="mr-2 h-4 w-4" />
             Excel
@@ -211,6 +265,68 @@ export default function Relatorios() {
           </Button>
         </div>
       </div>
+
+      {/* Critical Clients Alert */}
+      {kilapeiros.length > 0 && (
+        <Card className="border-l-4 border-l-destructive bg-destructive/5">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+                <CardTitle className="text-lg">Kilapeiros - Pagamento Rápido</CardTitle>
+              </div>
+              <Badge variant="destructive" className="text-sm">
+                {kilapeiros.length} Clientes
+              </Badge>
+            </div>
+            <CardDescription>
+              Clientes com pagamentos em atraso - clique em "Pagar" para registrar
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {kilapeiros.map(({ client, paymentStatus }) => {
+                const filial = filiais.find(f => f.id === client.filialId);
+                return (
+                  <div 
+                    key={client.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-background border hover:border-destructive transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{client.name}</p>
+                        <Badge 
+                          variant="destructive"
+                          className="text-xs"
+                        >
+                          {paymentStatus.overdueCount} meses
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                        <span>{filial?.name}</span>
+                        <span className="text-destructive font-medium">
+                          Dívida: {paymentStatus.totalDebt.toLocaleString()} AOA
+                        </span>
+                      </div>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      className="gradient-primary"
+                      onClick={() => {
+                        setSelectedClientForPayment(client);
+                        setIsPaymentModalOpen(true);
+                      }}
+                    >
+                      <CreditCard className="w-4 h-4 mr-1" />
+                      Pagar
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card className="border-0 shadow-primary">
@@ -423,6 +539,21 @@ export default function Relatorios() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Payment Modal */}
+      {selectedClientForPayment && (
+        <QuickPaymentModal
+          client={selectedClientForPayment}
+          mensalidades={mensalidades.filter(m => m.clientId === selectedClientForPayment.id)}
+          filiais={filiais}
+          open={isPaymentModalOpen}
+          onClose={() => {
+            setIsPaymentModalOpen(false);
+            setSelectedClientForPayment(null);
+          }}
+          onPayment={handlePayment}
+        />
+      )}
     </div>
   );
 }
