@@ -5,8 +5,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Client, Mensalidade } from '@/types';
-import { mockFiliais } from '@/data/mock';
+import { Client, Mensalidade, Filial } from '@/types';
 
 // Helper component for mensalidade item
 function MensalidadeItem({ 
@@ -71,6 +70,7 @@ interface QuickPaymentModalProps {
   onClose: () => void;
   client: Client;
   mensalidades: Mensalidade[];
+  filiais: Filial[];
   onPayment: (mensalidadeIds: string[]) => void;
 }
 
@@ -79,6 +79,7 @@ export function QuickPaymentModal({
   onClose, 
   client, 
   mensalidades,
+  filiais,
   onPayment 
 }: QuickPaymentModalProps) {
   const [selectedMensalidades, setSelectedMensalidades] = useState<string[]>([]);
@@ -105,7 +106,7 @@ export function QuickPaymentModal({
   };
 
   const availableMonths = generateAvailableMonths();
-  const filial = mockFiliais.find(f => f.id === client.filialId);
+  const filial = filiais.find(f => f.id === client.filialId);
   const today = new Date();
   const currentMonth = today.getMonth() + 1;
   const currentYear = today.getFullYear();

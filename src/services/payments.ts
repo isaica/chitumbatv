@@ -1,10 +1,10 @@
-import { Client, Mensalidade } from '@/types';
-import { mockFiliais } from '@/data/mock';
+import { Client, Mensalidade, Filial } from '@/types';
 
 export function confirmPayments(
   mensalidadeIds: string[],
   clients: Client[],
-  mensalidades: Mensalidade[]
+  mensalidades: Mensalidade[],
+  filiais: Filial[]
 ): Mensalidade[] {
   const now = new Date();
   const existingIds = mensalidadeIds.filter(id => !id.startsWith('virtual-'));
@@ -16,7 +16,7 @@ export function confirmPayments(
     const year = parseInt(parts[parts.length - 2]);
     const month = parseInt(parts[parts.length - 1]);
     const client = clients.find(c => c.id === clientId);
-    const filial = client ? mockFiliais.find(f => f.id === client.filialId) : null;
+    const filial = client ? filiais.find(f => f.id === client.filialId) : null;
     return {
       id: `${clientId}-${year}-${month}-${Date.now()}`,
       clientId,
