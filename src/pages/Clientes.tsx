@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal, User, CreditCard, AlertCircle, DollarSign, Download, FileText, FileSpreadsheet, FileDown, Printer, Users, CheckCircle, XCircle, Filter } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal, User, CreditCard, AlertCircle, DollarSign, Download, FileText, FileSpreadsheet, FileDown, Printer, Users, CheckCircle, XCircle, Filter, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +20,7 @@ import { Client, Mensalidade } from '@/types';
 import { calculateClientPaymentStatus, getStatusLabel, getStatusColor } from '@/utils/paymentStatus';
 import { ClientDetailsModal } from '@/components/ui/client-details-modal';
 import { QuickPaymentModal } from '@/components/ui/quick-payment-modal';
+import { ClientSelectModal } from '@/components/ui/client-select-modal';
 import { useAuth } from '@/contexts/AuthContext';
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
 import { NoClients, NoSearchResults } from '@/components/ui/empty-states';
@@ -71,6 +72,7 @@ export default function Clientes() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [paymentClient, setPaymentClient] = useState<Client | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isClientSelectOpen, setIsClientSelectOpen] = useState(false);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   
   // Advanced Filters
@@ -268,6 +270,12 @@ export default function Clientes() {
       setPaymentClient(client);
       setIsPaymentModalOpen(true);
     }
+  };
+
+  const handleClientSelect = (client: Client) => {
+    setPaymentClient(client);
+    setIsClientSelectOpen(false);
+    setIsPaymentModalOpen(true);
   };
 
   const handleConfirmPayment = (mensalidadeIds: string[]) => {
@@ -483,6 +491,11 @@ export default function Clientes() {
           </p>
         </div>
         <div className="flex gap-2 flex-shrink-0">
+          <Button onClick={() => setIsClientSelectOpen(true)} className="text-xs sm:text-sm">
+            <Receipt className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Registrar Pagamento</span>
+          </Button>
+          
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="text-xs sm:text-sm">
@@ -1035,6 +1048,16 @@ export default function Clientes() {
           onReactivateClient={handleReactivateClient}
         />
       )}
+
+      {/* Client Select Modal */}
+      <ClientSelectModal
+        open={isClientSelectOpen}
+        onClose={() => setIsClientSelectOpen(false)}
+        onSelectClient={handleClientSelect}
+        clients={clients}
+        filiais={filiais}
+        mensalidades={mensalidades}
+      />
 
       {/* Payment Modal */}
       {paymentClient && (

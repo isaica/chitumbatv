@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart
 } from 'recharts';
-import { TrendingUp, TrendingDown, Users, UserCheck, CreditCard, AlertTriangle, DollarSign, Calendar, Eye, Download } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, UserCheck, CreditCard, AlertTriangle, DollarSign, Calendar, Eye, Download, Plus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { exportToPDF } from '@/utils/export';
 import { calculateClientPaymentStatus } from '@/utils/paymentStatus';
 import { useNavigate } from 'react-router-dom';
 import { QuickPaymentModal } from '@/components/ui/quick-payment-modal';
+import { ClientSelectModal } from '@/components/ui/client-select-modal';
 import { Client, Mensalidade, Filial } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { RevenueByFilialChart } from '@/components/dashboard/RevenueByFilialChart';
@@ -155,8 +156,15 @@ export default function Dashboard() {
   const { clients, mensalidades, filiais, setMensalidades } = useAppStore();
   
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isClientSelectOpen, setIsClientSelectOpen] = useState(false);
   const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
   const currentMonth = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+
+  const handleClientSelect = (client: Client) => {
+    setSelectedClientForPayment(client);
+    setIsClientSelectOpen(false);
+    setIsPaymentModalOpen(true);
+  };
 
   const handlePayment = (mensalidadeIds: string[]) => {
     const existingIds = mensalidadeIds.filter(id => !id.startsWith('virtual-'));
@@ -282,13 +290,13 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2 flex-shrink-0">
+          <Button onClick={() => setIsClientSelectOpen(true)} className="text-xs sm:text-sm">
+            <Plus className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Registrar Pagamento</span>
+          </Button>
           <Button variant="outline" size="sm" onClick={handleExportDashboard} className="text-xs sm:text-sm">
             <Download className="w-4 h-4 sm:mr-2" />
             <span className="hidden sm:inline">Exportar</span>
-          </Button>
-          <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-            <Eye className="w-4 h-4 sm:mr-2" />
-            <span className="hidden sm:inline">Visualização</span>
           </Button>
         </div>
       </div>
@@ -638,6 +646,16 @@ export default function Dashboard() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Client Select Modal */}
+      <ClientSelectModal
+        open={isClientSelectOpen}
+        onClose={() => setIsClientSelectOpen(false)}
+        onSelectClient={handleClientSelect}
+        clients={clients}
+        filiais={filiais}
+        mensalidades={mensalidades}
+      />
 
       {/* Payment Modal */}
       {selectedClientForPayment && (

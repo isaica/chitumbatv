@@ -9,7 +9,8 @@ import {
   CreditCard,
   FileText,
   DollarSign,
-  AlertTriangle
+  AlertTriangle,
+  Receipt
 } from "lucide-react";
 import { 
   BarChart, 
@@ -30,6 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppStore } from "@/stores/useAppStore";
 import { QuickPaymentModal } from "@/components/ui/quick-payment-modal";
+import { ClientSelectModal } from "@/components/ui/client-select-modal";
 import { Client, Mensalidade } from "@/types";
 import { calculateClientPaymentStatus } from "@/utils/paymentStatus";
 
@@ -40,8 +42,15 @@ export default function Relatorios() {
   const [selectedPeriod, setSelectedPeriod] = useState('3months');
   const [selectedFilial, setSelectedFilial] = useState('all');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isClientSelectOpen, setIsClientSelectOpen] = useState(false);
   const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
   const { toast } = useToast();
+
+  const handleClientSelect = (client: Client) => {
+    setSelectedClientForPayment(client);
+    setIsClientSelectOpen(false);
+    setIsPaymentModalOpen(true);
+  };
 
   // Filter data based on user role
   const availableFiliais = user?.role === 'admin' 
@@ -255,6 +264,10 @@ export default function Relatorios() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={() => setIsClientSelectOpen(true)}>
+            <Receipt className="mr-2 h-4 w-4" />
+            Registrar Pagamento
+          </Button>
           <Button variant="outline" onClick={() => handleExport('excel')}>
             <Download className="mr-2 h-4 w-4" />
             Excel
@@ -539,6 +552,16 @@ export default function Relatorios() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Client Select Modal */}
+      <ClientSelectModal
+        open={isClientSelectOpen}
+        onClose={() => setIsClientSelectOpen(false)}
+        onSelectClient={handleClientSelect}
+        clients={clients}
+        filiais={filiais}
+        mensalidades={mensalidades}
+      />
 
       {/* Payment Modal */}
       {selectedClientForPayment && (
