@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { NotificationProvider } from "@/components/ui/notification-system";
 import { Layout } from "@/components/layout/Layout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -11,6 +12,7 @@ import Filiais from "./pages/Filiais";
 import Clientes from "./pages/Clientes";
 import Mensalidades from "./pages/Mensalidades";
 import Usuarios from "./pages/Usuarios";
+import Precos from "./pages/PrecosPorFilial";
 import Relatorios from "./pages/Relatorios";
 import NotFound from "./pages/NotFound";
 
@@ -31,6 +33,7 @@ function AppRoutes() {
         <Route path="/clientes" element={<Clientes />} />
         <Route path="/mensalidades" element={<Mensalidades />} />
         <Route path="/usuarios" element={<Usuarios />} />
+        <Route path="/precos" element={<Precos />} />
         <Route path="/relatorios" element={<Relatorios />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
@@ -41,13 +44,15 @@ function AppRoutes() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </BrowserRouter>
+      <NotificationProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </BrowserRouter>
+      </NotificationProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
