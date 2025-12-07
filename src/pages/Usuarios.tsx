@@ -2,21 +2,25 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Search, Edit, Trash2, MoreHorizontal, UserCog, Shield, Eye, EyeOff } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, MoreHorizontal, UserCog, Shield, Eye, EyeOff, UserCheck, UserX, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { mockUsers, mockFiliais } from '@/data/mock';
 import { User } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
+import { NoUsers, NoSearchResults } from '@/components/ui/empty-states';
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
+import { useAppStore } from '@/stores/useAppStore';
 
 const userSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -25,18 +29,22 @@ const userSchema = z.object({
   role: z.enum(['admin', 'gerente', 'funcionario']),
   filialId: z.string().optional(),
   isActive: z.boolean(),
+  phone: z.string().optional(),
 });
 
 type UserFormData = z.infer<typeof userSchema>;
 
 export default function Usuarios() {
   const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState<User[]>(mockUsers);
+  const { usuarios, filiais, addUsuario, updateUsuario, deleteUsuario } = useAppStore();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'gerente' | 'funcionario'>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const { toast } = useToast();
 
   const {
@@ -55,17 +63,17 @@ export default function Usuarios() {
 
   const watchedRole = watch('role');
 
-  const filteredUsers = users.filter((user) => {
+  const filteredUsers = usuarios.filter((user) => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (user.phone || '').includes(searchTerm);
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     
-    // Only admin can see all users, gerente can see only their filial
     let hasAccess = true;
-    if (currentUser?.role === 'gerente') {
-      hasAccess = user.filialId === currentUser.filialId || user.role === 'admin';
-    } else if (currentUser?.role === 'funcionario') {
-      hasAccess = user.id === currentUser.id; // Can only see themselves
+    if (currentUser?.role === 'admin') {
+      hasAccess = true;
+    } else {
+      hasAccess = user.filialId === currentUser?.filialId;
     }
     
     return matchesSearch && matchesRole && hasAccess;
@@ -73,7 +81,7 @@ export default function Usuarios() {
 
   const getFilialName = (filialId?: string) => {
     if (!filialId) return 'Todas as filiais';
-    return mockFiliais.find(f => f.id === filialId)?.name || 'N/A';
+    return filiais.find(f => f.id === filialId)?.name || 'N/A';
   };
 
   const getRoleColor = (role: string) => {
@@ -119,7 +127,7 @@ export default function Usuarios() {
       setValue('role', user.role);
       setValue('filialId', user.filialId);
       setValue('isActive', user.isActive);
-      setValue('password', ''); // Don't prefill password
+      setValue('password', '');
     } else {
       setEditingUser(null);
       reset();
@@ -135,35 +143,32 @@ export default function Usuarios() {
 
   const onSubmit = (data: UserFormData) => {
     if (editingUser) {
-      // Update existing user
-      setUsers(prev => prev.map(u => 
-        u.id === editingUser.id 
-          ? { 
-              ...u, 
-              name: data.name,
-              email: data.email,
-              role: data.role,
-              filialId: data.filialId,
-              isActive: data.isActive,
-            }
-          : u
-      ));
+      updateUsuario(editingUser.id, {
+        name: data.name,
+        email: data.email,
+        phone: data.phone ?? editingUser.phone ?? '',
+        role: data.role,
+        filialId: data.filialId,
+        isActive: data.isActive,
+        password: data.password ? data.password : editingUser.password,
+      });
       toast({
         title: 'Usuário atualizado',
         description: 'Os dados do usuário foram atualizados com sucesso.',
       });
     } else {
-      // Create new user
       const newUser: User = {
         id: Date.now().toString(),
         name: data.name,
         email: data.email,
+        phone: data.phone || '',
         role: data.role,
         filialId: data.filialId,
         isActive: data.isActive,
+        password: data.password,
         createdAt: new Date(),
       };
-      setUsers(prev => [...prev, newUser]);
+      addUsuario(newUser);
       toast({
         title: 'Usuário criado',
         description: 'Novo usuário foi adicionado com sucesso.',
@@ -172,7 +177,7 @@ export default function Usuarios() {
     handleCloseDialog();
   };
 
-  const handleDelete = (user: User) => {
+  const handleDeleteClick = (user: User) => {
     if (user.id === currentUser?.id) {
       toast({
         title: 'Não é possível excluir',
@@ -181,32 +186,54 @@ export default function Usuarios() {
       });
       return;
     }
+    setUserToDelete(user);
+    setDeleteDialogOpen(true);
+  };
 
-    setUsers(prev => prev.filter(u => u.id !== user.id));
+  const handleConfirmDelete = () => {
+    if (!userToDelete) return;
+    
+    deleteUsuario(userToDelete.id);
     toast({
       title: 'Usuário excluído',
       description: 'O usuário foi removido com sucesso.',
     });
+    setDeleteDialogOpen(false);
+    setUserToDelete(null);
   };
 
   const toggleUserStatus = (userId: string) => {
-    setUsers(prev => prev.map(u => 
-      u.id === userId 
-        ? { ...u, isActive: !u.isActive }
-        : u
-    ));
-    toast({
-      title: 'Status atualizado',
-      description: 'O status do usuário foi alterado com sucesso.',
-    });
+    const user = usuarios.find(u => u.id === userId);
+    if (user) {
+      updateUsuario(userId, { isActive: !user.isActive });
+      toast({
+        title: 'Status atualizado',
+        description: 'O status do usuário foi alterado com sucesso.',
+      });
+    }
   };
+
+  // Summary metrics
+  const totalUsers = usuarios.length;
+  const activeUsers = usuarios.filter(u => u.isActive).length;
+  const adminCount = usuarios.filter(u => u.role === 'admin').length;
+  const gerenteCount = usuarios.filter(u => u.role === 'gerente').length;
+  const funcionarioCount = usuarios.filter(u => u.role === 'funcionario').length;
 
   // Check if current user can manage users
   const canManageUsers = currentUser?.role === 'admin' || currentUser?.role === 'gerente';
 
   if (!canManageUsers) {
+    const [newPassword, setNewPassword] = useState('');
+    const changeOwnPassword = () => {
+      if (!currentUser || newPassword.length < 6) return;
+      updateUsuario(currentUser.id, { password: newPassword });
+      setNewPassword('');
+      toast({ title: 'Senha atualizada', description: 'Sua senha foi alterada com sucesso.' });
+    };
     return (
       <div className="space-y-6">
+        <Breadcrumbs />
         <div>
           <h1 className="text-3xl font-bold text-gradient">Meu Perfil</h1>
           <p className="text-muted-foreground">
@@ -250,17 +277,35 @@ export default function Usuarios() {
             </div>
           </CardContent>
         </Card>
+        <Card className="border-0 shadow-primary max-w-md">
+          <CardHeader>
+            <CardTitle>Alterar Senha</CardTitle>
+            <CardDescription>Atualize sua senha</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Label htmlFor="newPassword">Nova Senha</Label>
+            <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+            <Button onClick={changeOwnPassword} className="gradient-primary">Atualizar Senha</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
+  const clearSearch = () => {
+    setSearchTerm('');
+    setRoleFilter('all');
+  };
+
   return (
     <div className="space-y-6">
+      <Breadcrumbs />
+      
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gradient">Gestão de Usuários</h1>
           <p className="text-muted-foreground">
-            Gerencie os usuários do sistema Chitumba
+            Gerencie os usuários do sistema ALF Chitumba
           </p>
         </div>
         {currentUser?.role === 'admin' && (
@@ -312,6 +357,14 @@ export default function Usuarios() {
                     {errors.email && (
                       <p className="text-sm text-destructive">{errors.email.message}</p>
                     )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Telefone</Label>
+                    <Input
+                      id="phone"
+                      placeholder="+244 9xx xxx xxx"
+                      {...register('phone')}
+                    />
                   </div>
                 </div>
 
@@ -368,7 +421,7 @@ export default function Usuarios() {
                           <SelectValue placeholder="Selecione a filial" />
                         </SelectTrigger>
                         <SelectContent>
-                          {mockFiliais.map((filial) => (
+                          {filiais.map((filial) => (
                             <SelectItem key={filial.id} value={filial.id}>
                               {filial.name}
                             </SelectItem>
@@ -393,6 +446,59 @@ export default function Usuarios() {
         )}
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <Card className="gradient-card border-0 shadow-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
+            <Users className="w-4 h-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalUsers}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="gradient-card border-0 shadow-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Usuários Ativos</CardTitle>
+            <UserCheck className="w-4 h-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">{activeUsers}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="gradient-card border-0 shadow-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Administradores</CardTitle>
+            <Shield className="w-4 h-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{adminCount}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="gradient-card border-0 shadow-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Gerentes</CardTitle>
+            <UserCog className="w-4 h-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{gerenteCount}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="gradient-card border-0 shadow-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Funcionários</CardTitle>
+            <UserCog className="w-4 h-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{funcionarioCount}</div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Filters */}
       <Card className="border-0 shadow-primary">
         <CardHeader>
@@ -403,7 +509,7 @@ export default function Usuarios() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
-                placeholder="Buscar por nome ou email..."
+                placeholder="Buscar por nome, email ou telefone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -425,96 +531,122 @@ export default function Usuarios() {
       </Card>
 
       {/* Results */}
-      <Card className="border-0 shadow-primary">
-        <CardHeader>
-          <CardTitle>
-            Usuários ({filteredUsers.length})
-          </CardTitle>
-          <CardDescription>
-            Lista de usuários do sistema
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Usuário</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Função</TableHead>
-                <TableHead>Filial</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-8 h-8">
-                        <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                          {getInitials(user.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">{user.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Criado em {user.createdAt.toLocaleDateString('pt-AO')}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getRoleIcon(user.role)}
-                      <Badge variant={getRoleColor(user.role)}>
-                        {user.role}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>{getFilialName(user.filialId)}</TableCell>
-                  <TableCell>
-                    <Badge variant={user.isActive ? 'default' : 'secondary'}>
-                      {user.isActive ? 'Ativo' : 'Inativo'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {currentUser?.role === 'admin' && (
-                          <>
-                            <DropdownMenuItem onClick={() => handleOpenDialog(user)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => toggleUserStatus(user.id)}>
-                              {user.isActive ? 'Desativar' : 'Ativar'} Usuário
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="text-destructive"
-                              onClick={() => handleDelete(user)}
-                              disabled={user.id === currentUser?.id}
+      {filteredUsers.length === 0 ? (
+        searchTerm || roleFilter !== 'all' ? (
+          <NoSearchResults searchTerm={searchTerm} onClear={clearSearch} />
+        ) : (
+          <NoUsers onCreate={() => handleOpenDialog()} />
+        )
+      ) : (
+        <PaginationWrapper data={filteredUsers} itemsPerPage={10}>
+          {(paginatedUsers, paginationInfo, paginationElement) => (
+            <div className="space-y-4">
+              <Card className="border-0 shadow-primary">
+                <CardHeader>
+                  <CardTitle>
+                    Usuários ({paginationInfo.totalItems})
+                  </CardTitle>
+                  <CardDescription>
+                    Lista de todos os usuários do sistema
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Usuário</TableHead>
+                        <TableHead>Função</TableHead>
+                        <TableHead>Filial</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedUsers.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar>
+                                <AvatarFallback className="bg-primary text-primary-foreground">
+                                  {getInitials(user.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium">{user.name}</div>
+                                <div className="text-sm text-muted-foreground">{user.email}</div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {getRoleIcon(user.role)}
+                              <Badge variant={getRoleColor(user.role)}>
+                                {user.role}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell>{getFilialName(user.filialId)}</TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={user.isActive ? 'default' : 'secondary'}
+                              className="cursor-pointer"
+                              onClick={() => toggleUserStatus(user.id)}
                             >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Excluir
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                              {user.isActive ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleOpenDialog(user)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeleteClick(user)}
+                                  className="text-destructive"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+              {paginationElement}
+            </div>
+          )}
+        </PaginationWrapper>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o usuário "{userToDelete?.name}"? 
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

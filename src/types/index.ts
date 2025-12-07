@@ -2,10 +2,12 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  phone: string;
   role: 'admin' | 'gerente' | 'funcionario';
   filialId?: string;
   avatar?: string;
   isActive: boolean;
+  password?: string;
   createdAt: Date;
 }
 
@@ -17,14 +19,8 @@ export interface Filial {
   email: string;
   responsavel: string;
   status: 'ativa' | 'inativa';
+  monthlyPrice: number;
   createdAt: Date;
-}
-
-export interface Plan {
-  id: string;
-  name: string;
-  price: number;
-  description: string;
 }
 
 export interface Client {
@@ -39,9 +35,8 @@ export interface Client {
     province: string;
   };
   document: string;
-  planId: string;
   filialId: string;
-  status: 'ativo' | 'inativo' | 'suspenso';
+  status: 'ativo' | 'inativo';
   createdAt: Date;
 }
 

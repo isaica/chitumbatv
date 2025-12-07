@@ -1,28 +1,122 @@
-import { useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Calendar, Download, FileText, TrendingDown, Users, CreditCard } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import { mockMensalidades, mockClients, mockFiliais } from '@/data/mock';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { 
+  Download, 
+  TrendingUp, 
+  TrendingDown,
+  Users, 
+  CreditCard,
+  FileText,
+  DollarSign,
+  AlertTriangle,
+  Receipt
+} from "lucide-react";
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
+} from "recharts";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { exportToExcel, exportToPDF, ExportColumn } from "@/utils/export";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAppStore } from "@/stores/useAppStore";
+import { QuickPaymentModal } from "@/components/ui/quick-payment-modal";
+import { ClientSelectModal } from "@/components/ui/client-select-modal";
+import { Client, Mensalidade } from "@/types";
+import { calculateClientPaymentStatus } from "@/utils/paymentStatus";
 
 export default function Relatorios() {
   const { user } = useAuth();
+  const { clients, mensalidades, filiais, setMensalidades } = useAppStore();
+  
   const [selectedPeriod, setSelectedPeriod] = useState('3months');
   const [selectedFilial, setSelectedFilial] = useState('all');
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isClientSelectOpen, setIsClientSelectOpen] = useState(false);
+  const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
   const { toast } = useToast();
+
+  const handleClientSelect = (client: Client) => {
+    setSelectedClientForPayment(client);
+    setIsClientSelectOpen(false);
+    setIsPaymentModalOpen(true);
+  };
 
   // Filter data based on user role
   const availableFiliais = user?.role === 'admin' 
-    ? mockFiliais 
-    : mockFiliais.filter(f => f.id === user?.filialId);
+    ? filiais 
+    : filiais.filter(f => f.id === user?.filialId);
 
   const userFilialClients = user?.role === 'admin' 
-    ? mockClients 
-    : mockClients.filter(c => c.filialId === user?.filialId);
+    ? clients 
+    : clients.filter(c => c.filialId === user?.filialId);
+
+  // Get kilapeiros (critical clients)
+  const kilapeiros = userFilialClients
+    .map(client => {
+      const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
+      const paymentStatus = calculateClientPaymentStatus(client, clientMensalidades);
+      return { client, paymentStatus };
+    })
+    .filter(({ paymentStatus }) => paymentStatus.status === 'kilapeiro')
+    .sort((a, b) => b.paymentStatus.overdueCount - a.paymentStatus.overdueCount)
+    .slice(0, 5);
+
+  // Handle payment
+  const handlePayment = (mensalidadeIds: string[]) => {
+    const existingIds = mensalidadeIds.filter(id => !id.startsWith('virtual-'));
+    const virtualIds = mensalidadeIds.filter(id => id.startsWith('virtual-'));
+    
+    const newMensalidades: Mensalidade[] = virtualIds.map(id => {
+      const parts = id.split('-');
+      const clientId = parts.slice(1, -2).join('-');
+      const year = parseInt(parts[parts.length - 2]);
+      const month = parseInt(parts[parts.length - 1]);
+      
+      const client = clients.find(c => c.id === clientId);
+      const filial = client ? filiais.find(f => f.id === client.filialId) : null;
+      
+      return {
+        id: `${clientId}-${year}-${month}-${Date.now()}`,
+        clientId,
+        month,
+        year,
+        amount: filial?.monthlyPrice || 0,
+        status: 'pago' as const,
+        dueDate: new Date(year, month - 1, 15),
+        paidAt: new Date(),
+        createdAt: new Date()
+      };
+    });
+    
+    const updatedMensalidades = [
+      ...mensalidades.map(m =>
+        existingIds.includes(m.id)
+          ? { ...m, status: 'pago' as const, paidAt: new Date() }
+          : m
+      ),
+      ...newMensalidades
+    ];
+    
+    setMensalidades(updatedMensalidades);
+    
+    toast({
+      title: 'Pagamento registrado',
+      description: `${mensalidadeIds.length} ${mensalidadeIds.length === 1 ? 'mensalidade paga' : 'mensalidades pagas'} com sucesso.`,
+    });
+    setIsPaymentModalOpen(false);
+    setSelectedClientForPayment(null);
+  };
 
   // Generate inadimplência data
   const getInadimplenciaData = () => {
@@ -35,14 +129,14 @@ export default function Relatorios() {
       const year = date.getFullYear();
       const month = date.getMonth() + 1;
       
-      const monthMensalidades = mockMensalidades.filter(m => 
+      const monthMensalidades = mensalidades.filter(m => 
         m.year === year && m.month === month
       );
       
       const filteredMensalidades = selectedFilial === 'all' 
         ? monthMensalidades
         : monthMensalidades.filter(m => {
-            const client = mockClients.find(c => c.id === m.clientId);
+            const client = clients.find(c => c.id === m.clientId);
             return client?.filialId === selectedFilial;
           });
 
@@ -73,13 +167,11 @@ export default function Relatorios() {
     const statusCounts = {
       ativo: filteredClients.filter(c => c.status === 'ativo').length,
       inativo: filteredClients.filter(c => c.status === 'inativo').length,
-      suspenso: filteredClients.filter(c => c.status === 'suspenso').length,
     };
 
     return [
       { name: 'Ativos', value: statusCounts.ativo, color: 'hsl(var(--primary))' },
       { name: 'Inativos', value: statusCounts.inativo, color: 'hsl(var(--muted))' },
-      { name: 'Suspensos', value: statusCounts.suspenso, color: 'hsl(var(--destructive))' },
     ];
   };
 
@@ -88,20 +180,78 @@ export default function Relatorios() {
 
   const totalClients = statusDistribution.reduce((acc, item) => acc + item.value, 0);
   const activeClients = statusDistribution.find(item => item.name === 'Ativos')?.value || 0;
-  const suspendedClients = statusDistribution.find(item => item.name === 'Suspensos')?.value || 0;
+  const inactiveClients = statusDistribution.find(item => item.name === 'Inativos')?.value || 0;
 
   // Calculate current month metrics
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
-  const currentMonthMensalidades = mockMensalidades.filter(m => 
+  const currentMonthMensalidades = mensalidades.filter(m => 
     m.year === currentYear && m.month === currentMonth
   );
 
   const handleExport = (type: 'pdf' | 'excel') => {
-    toast({
-      title: 'Exportação em desenvolvimento',
-      description: `A exportação para ${type.toUpperCase()} será implementada em breve.`,
+    // Filter data based on selected filial
+    const filteredClients = selectedFilial === 'all' 
+      ? userFilialClients
+      : userFilialClients.filter(c => c.filialId === selectedFilial);
+
+    // Prepare export data with client info and payment status
+    const exportData = filteredClients.map(client => {
+      const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
+      const pendingCount = clientMensalidades.filter(m => m.status === 'pendente' || m.status === 'atrasado').length;
+      const totalDebt = clientMensalidades
+        .filter(m => m.status === 'pendente' || m.status === 'atrasado')
+        .reduce((acc, m) => acc + m.amount, 0);
+      const filial = filiais.find(f => f.id === client.filialId);
+
+      return {
+        name: client.name,
+        email: client.email,
+        phone: client.phone,
+        filial: filial?.name || 'N/A',
+        status: client.status,
+        pendingMonths: pendingCount,
+        totalDebt: totalDebt,
+        createdAt: client.createdAt
+      };
     });
+
+    const columns: ExportColumn[] = [
+      { key: 'name', title: 'Nome', width: 40 },
+      { key: 'phone', title: 'Telefone', width: 25 },
+      { key: 'filial', title: 'Filial', width: 30 },
+      { key: 'status', title: 'Status', width: 15, format: (v) => v === 'ativo' ? 'Ativo' : 'Inativo' },
+      { key: 'pendingMonths', title: 'Meses Pendentes', width: 20 },
+      { key: 'totalDebt', title: 'Dívida Total (AOA)', width: 25, format: (v) => v.toLocaleString('pt-AO') },
+      { key: 'createdAt', title: 'Data Cadastro', width: 25, format: (v) => new Date(v).toLocaleDateString('pt-AO') }
+    ];
+
+    const filialName = selectedFilial === 'all' 
+      ? 'Todas as Filiais' 
+      : filiais.find(f => f.id === selectedFilial)?.name || '';
+
+    const options = {
+      filename: `relatorio_clientes_${new Date().toISOString().split('T')[0]}`,
+      title: 'Relatório de Clientes - ALF Chitumba',
+      subtitle: `Filial: ${filialName} | Período: ${selectedPeriod === '3months' ? 'Últimos 3 meses' : selectedPeriod === '6months' ? 'Últimos 6 meses' : 'Último ano'}`,
+      columns,
+      data: exportData,
+      orientation: 'landscape' as const
+    };
+
+    if (type === 'pdf') {
+      exportToPDF(options);
+      toast({
+        title: 'PDF Exportado',
+        description: 'O relatório foi exportado com sucesso.',
+      });
+    } else {
+      exportToExcel(options);
+      toast({
+        title: 'Excel Exportado',
+        description: 'O relatório foi exportado com sucesso.',
+      });
+    }
   };
 
   return (
@@ -114,16 +264,82 @@ export default function Relatorios() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={() => setIsClientSelectOpen(true)}>
+            <Receipt className="mr-2 h-4 w-4" />
+            Registrar Pagamento
+          </Button>
           <Button variant="outline" onClick={() => handleExport('excel')}>
-            <Download className="w-4 h-4 mr-2" />
+            <Download className="mr-2 h-4 w-4" />
             Excel
           </Button>
           <Button variant="outline" onClick={() => handleExport('pdf')}>
-            <FileText className="w-4 h-4 mr-2" />
+            <FileText className="mr-2 h-4 w-4" />
             PDF
           </Button>
         </div>
       </div>
+
+      {/* Critical Clients Alert */}
+      {kilapeiros.length > 0 && (
+        <Card className="border-l-4 border-l-destructive bg-destructive/5">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+                <CardTitle className="text-lg">Kilapeiros - Pagamento Rápido</CardTitle>
+              </div>
+              <Badge variant="destructive" className="text-sm">
+                {kilapeiros.length} Clientes
+              </Badge>
+            </div>
+            <CardDescription>
+              Clientes com pagamentos em atraso - clique em "Pagar" para registrar
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {kilapeiros.map(({ client, paymentStatus }) => {
+                const filial = filiais.find(f => f.id === client.filialId);
+                return (
+                  <div 
+                    key={client.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-background border hover:border-destructive transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{client.name}</p>
+                        <Badge 
+                          variant="destructive"
+                          className="text-xs"
+                        >
+                          {paymentStatus.overdueCount} meses
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                        <span>{filial?.name}</span>
+                        <span className="text-destructive font-medium">
+                          Dívida: {paymentStatus.totalDebt.toLocaleString()} AOA
+                        </span>
+                      </div>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      className="gradient-primary"
+                      onClick={() => {
+                        setSelectedClientForPayment(client);
+                        setIsPaymentModalOpen(true);
+                      }}
+                    >
+                      <CreditCard className="w-4 h-4 mr-1" />
+                      Pagar
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card className="border-0 shadow-primary">
@@ -149,7 +365,7 @@ export default function Relatorios() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as Filiais</SelectItem>
-                  {mockFiliais.map((filial) => (
+                  {filiais.map((filial) => (
                     <SelectItem key={filial.id} value={filial.id}>
                       {filial.name}
                     </SelectItem>
@@ -179,7 +395,7 @@ export default function Relatorios() {
         <Card className="gradient-card border-0 shadow-primary">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Taxa de Atividade</CardTitle>
-            <TrendingDown className="w-4 h-4 text-success" />
+            <TrendingUp className="w-4 h-4 text-success" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -193,11 +409,11 @@ export default function Relatorios() {
 
         <Card className="gradient-card border-0 shadow-primary">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Clientes Suspensos</CardTitle>
-            <TrendingDown className="w-4 h-4 text-destructive" />
+            <CardTitle className="text-sm font-medium">Clientes Inativos</CardTitle>
+            <TrendingDown className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{suspendedClients}</div>
+            <div className="text-2xl font-bold text-muted-foreground">{inactiveClients}</div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <span>precisam atenção</span>
             </div>
@@ -336,6 +552,31 @@ export default function Relatorios() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Client Select Modal */}
+      <ClientSelectModal
+        open={isClientSelectOpen}
+        onClose={() => setIsClientSelectOpen(false)}
+        onSelectClient={handleClientSelect}
+        clients={clients}
+        filiais={filiais}
+        mensalidades={mensalidades}
+      />
+
+      {/* Payment Modal */}
+      {selectedClientForPayment && (
+        <QuickPaymentModal
+          client={selectedClientForPayment}
+          mensalidades={mensalidades.filter(m => m.clientId === selectedClientForPayment.id)}
+          filiais={filiais}
+          open={isPaymentModalOpen}
+          onClose={() => {
+            setIsPaymentModalOpen(false);
+            setSelectedClientForPayment(null);
+          }}
+          onPayment={handlePayment}
+        />
+      )}
     </div>
   );
 }

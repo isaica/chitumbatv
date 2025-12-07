@@ -10,8 +10,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    mode === 'development' &&
-    componentTagger(),
+    mode === 'development' && process.env.VITE_LOVABLE_ENABLED === 'true' && componentTagger(),
   ].filter(Boolean),
   resolve: {
     alias: {
