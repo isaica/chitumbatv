@@ -1,4 +1,4 @@
-# Welcome to myLovable projectooo Chitumbaa
+# Welcome to myLovable projecto Chitumbaa
 
 ##  Info do Project
 
