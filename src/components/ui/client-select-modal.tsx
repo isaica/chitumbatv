@@ -33,7 +33,7 @@ export function ClientSelectModal({
     if (client.status === 'inativo') return 'inativo';
     const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
     const unpaidCount = clientMensalidades.filter(m => m.status === 'pendente' || m.status === 'atrasado').length;
-    return unpaidCount >= 2 ? 'kilapeiro' : 'pago';
+    return unpaidCount > 0 ? 'kilapeiro' : 'pago';
   };
 
   const filteredClients = useMemo(() => {
@@ -41,7 +41,7 @@ export function ClientSelectModal({
       if (client.status === 'inativo') return 'inativo';
       const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
       const unpaidCount = clientMensalidades.filter(m => m.status === 'pendente' || m.status === 'atrasado').length;
-      return unpaidCount >= 2 ? 'kilapeiro' : 'pago';
+      return unpaidCount > 0 ? 'kilapeiro' : 'pago';
     };
 
     return clients.filter(client => {
