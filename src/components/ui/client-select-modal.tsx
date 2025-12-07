@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Search, User, MapPin, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Search, User, MapPin, AlertTriangle, CheckCircle, Filter } from 'lucide-react';
 import { Client, Filial, Mensalidade } from '@/types';
 
 interface ClientSelectModalProps {
@@ -16,6 +16,8 @@ interface ClientSelectModalProps {
   mensalidades: Mensalidade[];
 }
 
+type StatusFilter = 'todos' | 'pago' | 'kilapeiro';
+
 export function ClientSelectModal({
   open,
   onClose,
@@ -25,6 +27,7 @@ export function ClientSelectModal({
   mensalidades
 }: ClientSelectModalProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos');
 
   const getClientStatus = (client: Client): 'pago' | 'kilapeiro' | 'inativo' => {
     if (client.status === 'inativo') return 'inativo';
@@ -34,28 +37,41 @@ export function ClientSelectModal({
   };
 
   const filteredClients = useMemo(() => {
-    if (!searchTerm.trim()) return clients.filter(c => c.status === 'ativo');
-    
-    const term = searchTerm.toLowerCase();
     return clients.filter(client => {
+      // Only active clients
       if (client.status !== 'ativo') return false;
-      const filial = filiais.find(f => f.id === client.filialId);
-      return (
-        client.name.toLowerCase().includes(term) ||
-        client.email.toLowerCase().includes(term) ||
-        client.phone.includes(term) ||
-        filial?.name.toLowerCase().includes(term)
-      );
+      
+      // Status filter
+      if (statusFilter !== 'todos') {
+        const clientStatus = getClientStatus(client);
+        if (clientStatus !== statusFilter) return false;
+      }
+      
+      // Search filter
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase();
+        const filial = filiais.find(f => f.id === client.filialId);
+        return (
+          client.name.toLowerCase().includes(term) ||
+          client.email.toLowerCase().includes(term) ||
+          client.phone.includes(term) ||
+          filial?.name.toLowerCase().includes(term)
+        );
+      }
+      
+      return true;
     });
-  }, [clients, filiais, searchTerm]);
+  }, [clients, filiais, mensalidades, searchTerm, statusFilter]);
 
   const handleSelect = (client: Client) => {
     onSelectClient(client);
     setSearchTerm('');
+    setStatusFilter('todos');
   };
 
   const handleClose = () => {
     setSearchTerm('');
+    setStatusFilter('todos');
     onClose();
   };
 
@@ -82,8 +98,40 @@ export function ClientSelectModal({
             />
           </div>
 
+          {/* Status Filter */}
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <div className="flex gap-2">
+              <Button
+                variant={statusFilter === 'todos' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('todos')}
+              >
+                Todos
+              </Button>
+              <Button
+                variant={statusFilter === 'pago' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('pago')}
+                className={statusFilter === 'pago' ? '' : 'text-green-600 border-green-600 hover:bg-green-50'}
+              >
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Pago
+              </Button>
+              <Button
+                variant={statusFilter === 'kilapeiro' ? 'destructive' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('kilapeiro')}
+                className={statusFilter === 'kilapeiro' ? '' : 'text-destructive border-destructive hover:bg-destructive/10'}
+              >
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Kilapeiro
+              </Button>
+            </div>
+          </div>
+
           {/* Client List */}
-          <ScrollArea className="h-[350px] pr-4">
+          <ScrollArea className="h-[300px] pr-4">
             <div className="space-y-2">
               {filteredClients.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
@@ -120,7 +168,7 @@ export function ClientSelectModal({
                             ) : (
                               <Badge variant="secondary" className="text-xs bg-green-500/10 text-green-600">
                                 <CheckCircle className="h-3 w-3 mr-1" />
-                                Em dia
+                                Pago
                               </Badge>
                             )}
                           </div>
