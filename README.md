@@ -1,6 +1,6 @@
 # Welcome to your Lovable project Chitumba
 
-## Project info
+## É a Bracnh do LOvable
 
 
 ## Devo eliminar algumas info depois de passar ao Trae
