@@ -419,13 +419,15 @@ export default function Dashboard() {
 
       {/* Enhanced Charts Section */}
       <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto">
-          <TabsTrigger value="overview" className="text-xs sm:text-sm">Visão Geral</TabsTrigger>
-          <TabsTrigger value="financial" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
-          <TabsTrigger value="payments" className="text-xs sm:text-sm">Pagamentos</TabsTrigger>
-          <TabsTrigger value="growth" className="text-xs sm:text-sm">Crescimento</TabsTrigger>
-          <TabsTrigger value="distribution" className="text-xs sm:text-sm">Distribuição</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:w-full sm:grid-cols-5 h-auto">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm whitespace-nowrap">Visão Geral</TabsTrigger>
+            <TabsTrigger value="financial" className="text-xs sm:text-sm whitespace-nowrap">Financeiro</TabsTrigger>
+            <TabsTrigger value="payments" className="text-xs sm:text-sm whitespace-nowrap">Pagamentos</TabsTrigger>
+            <TabsTrigger value="growth" className="text-xs sm:text-sm whitespace-nowrap">Crescimento</TabsTrigger>
+            <TabsTrigger value="distribution" className="text-xs sm:text-sm whitespace-nowrap">Distribuição</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="overview" className="space-y-4 sm:space-y-6">
           <div className="grid gap-4 sm:gap-6 lg:grid-cols-7">

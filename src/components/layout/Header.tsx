@@ -1,7 +1,5 @@
-import { useState } from 'react';
 import { Bell, Search, User, LogOut, Settings, Menu, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +14,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { GlobalSearch } from './GlobalSearch';
 import { NotificationDropdown } from './NotificationDropdown';
+import { MobileSearch } from './MobileSearch';
 
 
 export function Header() {
@@ -41,12 +40,8 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4">
-          {/* Mobile Search Button */}
-          <div className="md:hidden">
-            <Button variant="ghost" size="sm">
-              <Search className="w-4 h-4" />
-            </Button>
-          </div>
+          {/* Mobile Search */}
+          <MobileSearch />
           
           <NotificationDropdown />
 
