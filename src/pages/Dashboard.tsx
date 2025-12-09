@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart
 } from 'recharts';
+import { MetricCardSkeleton } from '@/components/ui/loading-states';
 import { TrendingUp, TrendingDown, Users, UserCheck, CreditCard, AlertTriangle, DollarSign, Calendar, Eye, Download, Plus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
