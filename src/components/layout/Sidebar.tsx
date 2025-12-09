@@ -1,3 +1,4 @@
+import { useMemo, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Building2, Users, UserCog, BarChart3, Tv, BadgeDollarSign } from 'lucide-react';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
@@ -5,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { calculateClientPaymentStatus } from '@/utils/paymentStatus';
 import { Badge } from '@/components/ui/badge';
 import { useAppStore } from '@/stores/useAppStore';
+import { useIsMobile } from '@/hooks/use-mobile';
 const menuItems = [{
   title: 'Dashboard',
   url: '/',
@@ -38,31 +40,37 @@ const menuItems = [{
   roles: ['admin', 'gerente']
 }];
 export function AppSidebar() {
-  const {
-    open
-  } = useSidebar();
+  const { open, setOpenMobile } = useSidebar();
   const location = useLocation();
-  const {
-    user
-  } = useAuth();
+  const { user } = useAuth();
+  const isMobile = useIsMobile();
   const currentPath = location.pathname;
   const collapsed = !open;
 
   // Use Zustand store for real-time data
-  const {
-    clients,
-    mensalidades
-  } = useAppStore();
+  const { clients, mensalidades } = useAppStore();
 
-  // Calculate badges
-  const userFilialClients = user?.role === 'admin' ? clients : clients.filter(c => c.filialId === user?.filialId);
+  // Calculate badges with memoization
+  const userFilialClients = useMemo(() => 
+    user?.role === 'admin' ? clients : clients.filter(c => c.filialId === user?.filialId),
+    [clients, user?.role, user?.filialId]
+  );
 
-  // Count clients with payment issues (Kilapeiros)
-  const clientsWithIssues = userFilialClients.filter(client => {
-    const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
-    const status = calculateClientPaymentStatus(client, clientMensalidades);
-    return status.status === 'kilapeiro';
-  }).length;
+  // Count clients with payment issues (Kilapeiros) - memoized
+  const clientsWithIssues = useMemo(() => {
+    return userFilialClients.filter(client => {
+      const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
+      const status = calculateClientPaymentStatus(client, clientMensalidades);
+      return status.status === 'kilapeiro';
+    }).length;
+  }, [userFilialClients, mensalidades]);
+
+  // Close mobile menu on navigation
+  const handleNavClick = useCallback(() => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [isMobile, setOpenMobile]);
   const getBadgeCount = (title: string) => {
     if (title === 'Clientes') return clientsWithIssues;
     return 0;
@@ -99,21 +107,31 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {filteredMenuItems.map(item => {
-              const badgeCount = item.badge ? getBadgeCount(item.title) : 0;
-              return <SidebarMenuItem key={item.title}>
+                const badgeCount = item.badge ? getBadgeCount(item.title) : 0;
+                return (
+                  <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild>
-                      <NavLink to={item.url} className={getNavCls(item.url)}>
+                      <NavLink 
+                        to={item.url} 
+                        className={getNavCls(item.url)}
+                        onClick={handleNavClick}
+                      >
                         <item.icon className={`${collapsed ? 'w-5 h-5' : 'w-4 h-4 mr-3'} flex-shrink-0`} />
-                        {!collapsed && <div className="flex items-center justify-between flex-1">
+                        {!collapsed && (
+                          <div className="flex items-center justify-between flex-1">
                             <span>{item.title}</span>
-                            {badgeCount > 0 && <Badge variant="destructive" className="ml-2 h-5 min-w-[20px] flex items-center justify-center px-1.5">
+                            {badgeCount > 0 && (
+                              <Badge variant="destructive" className="ml-2 h-5 min-w-[20px] flex items-center justify-center px-1.5">
                                 {badgeCount}
-                              </Badge>}
-                          </div>}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
                       </NavLink>
                     </SidebarMenuButton>
-                  </SidebarMenuItem>;
-            })}
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
