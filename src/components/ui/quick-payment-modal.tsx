@@ -230,7 +230,8 @@ export function QuickPaymentModal({
         setSelectedMensalidades(smartSelection);
       }
     }
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, overdueMensalidades.length, currentMensalidades.length]);
 
   // Reset selection when modal closes
   useEffect(() => {

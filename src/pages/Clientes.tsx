@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -74,6 +75,8 @@ export default function Clientes() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isClientSelectOpen, setIsClientSelectOpen] = useState(false);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   
   // Advanced Filters
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
@@ -232,12 +235,21 @@ export default function Clientes() {
     handleCloseDialog();
   };
 
-  const handleDelete = (client: Client) => {
-    deleteClient(client.id);
+  const handleDeleteClick = (client: Client) => {
+    setClientToDelete(client);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!clientToDelete) return;
+    
+    deleteClient(clientToDelete.id);
     toast({
       title: 'Cliente excluído',
       description: 'O cliente foi removido com sucesso.',
     });
+    setDeleteDialogOpen(false);
+    setClientToDelete(null);
   };
 
   const clearSearch = () => {
@@ -912,7 +924,7 @@ export default function Clientes() {
                                 { label: 'Ver Detalhes', onClick: () => handleViewDetails(client) },
                                 { label: 'Registrar Pagamento', onClick: () => handleRegisterPayment(client.id) },
                                 { label: 'Editar', onClick: () => handleOpenDialog(client) },
-                                { label: 'Excluir', onClick: () => handleDelete(client), variant: 'destructive' },
+                                { label: 'Excluir', onClick: () => handleDeleteClick(client), variant: 'destructive' },
                               ]}
                             />
                           }
@@ -1008,7 +1020,7 @@ export default function Clientes() {
                                       Editar
                                     </DropdownMenuItem>
                                     <DropdownMenuItem 
-                                      onClick={() => handleDelete(client)}
+                                      onClick={() => handleDeleteClick(client)}
                                       className="text-destructive"
                                     >
                                       <Trash2 className="w-4 h-4 mr-2" />
@@ -1073,6 +1085,30 @@ export default function Clientes() {
           onPayment={handleConfirmPayment}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o cliente "{clientToDelete?.name}"? 
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setClientToDelete(null)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

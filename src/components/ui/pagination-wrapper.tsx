@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Pagination,
   PaginationContent,
@@ -87,9 +87,13 @@ export function PaginationWrapper<T>({
     return pages;
   };
 
-  // Reset to page 1 when data changes
-  useMemo(() => {
-    setCurrentPage(1);
+  // Reset to page 1 when data length changes
+  const prevDataLength = useRef(data.length);
+  useEffect(() => {
+    if (prevDataLength.current !== data.length) {
+      setCurrentPage(1);
+      prevDataLength.current = data.length;
+    }
   }, [data.length]);
 
   const paginationElement = paginationInfo.totalPages > 1 ? (

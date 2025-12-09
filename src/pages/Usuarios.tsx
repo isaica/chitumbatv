@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -220,17 +220,20 @@ export default function Usuarios() {
   const gerenteCount = usuarios.filter(u => u.role === 'gerente').length;
   const funcionarioCount = usuarios.filter(u => u.role === 'funcionario').length;
 
+  // State for own password (must be at top level to avoid conditional hook)
+  const [newPassword, setNewPassword] = useState('');
+  
   // Check if current user can manage users
   const canManageUsers = currentUser?.role === 'admin' || currentUser?.role === 'gerente';
 
+  const changeOwnPassword = () => {
+    if (!currentUser || newPassword.length < 6) return;
+    updateUsuario(currentUser.id, { password: newPassword });
+    setNewPassword('');
+    toast({ title: 'Senha atualizada', description: 'Sua senha foi alterada com sucesso.' });
+  };
+
   if (!canManageUsers) {
-    const [newPassword, setNewPassword] = useState('');
-    const changeOwnPassword = () => {
-      if (!currentUser || newPassword.length < 6) return;
-      updateUsuario(currentUser.id, { password: newPassword });
-      setNewPassword('');
-      toast({ title: 'Senha atualizada', description: 'Sua senha foi alterada com sucesso.' });
-    };
     return (
       <div className="space-y-6">
         <Breadcrumbs />
@@ -447,7 +450,7 @@ export default function Usuarios() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         <Card className="gradient-card border-0 shadow-primary">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
@@ -505,7 +508,7 @@ export default function Usuarios() {
           <CardTitle className="text-lg">Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
@@ -516,7 +519,7 @@ export default function Usuarios() {
               />
             </div>
             <Select value={roleFilter} onValueChange={(value: any) => setRoleFilter(value)}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="Função" />
               </SelectTrigger>
               <SelectContent>

@@ -32,8 +32,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useAppStore } from "@/stores/useAppStore";
 import { QuickPaymentModal } from "@/components/ui/quick-payment-modal";
 import { ClientSelectModal } from "@/components/ui/client-select-modal";
-import { Client, Mensalidade } from "@/types";
+import { Client } from "@/types";
 import { calculateClientPaymentStatus } from "@/utils/paymentStatus";
+import { confirmPayments } from "@/services/payments";
 
 export default function Relatorios() {
   const { user } = useAuth();
@@ -72,42 +73,9 @@ export default function Relatorios() {
     .sort((a, b) => b.paymentStatus.overdueCount - a.paymentStatus.overdueCount)
     .slice(0, 5);
 
-  // Handle payment
+  // Handle payment - centralized using payments service
   const handlePayment = (mensalidadeIds: string[]) => {
-    const existingIds = mensalidadeIds.filter(id => !id.startsWith('virtual-'));
-    const virtualIds = mensalidadeIds.filter(id => id.startsWith('virtual-'));
-    
-    const newMensalidades: Mensalidade[] = virtualIds.map(id => {
-      const parts = id.split('-');
-      const clientId = parts.slice(1, -2).join('-');
-      const year = parseInt(parts[parts.length - 2]);
-      const month = parseInt(parts[parts.length - 1]);
-      
-      const client = clients.find(c => c.id === clientId);
-      const filial = client ? filiais.find(f => f.id === client.filialId) : null;
-      
-      return {
-        id: `${clientId}-${year}-${month}-${Date.now()}`,
-        clientId,
-        month,
-        year,
-        amount: filial?.monthlyPrice || 0,
-        status: 'pago' as const,
-        dueDate: new Date(year, month - 1, 15),
-        paidAt: new Date(),
-        createdAt: new Date()
-      };
-    });
-    
-    const updatedMensalidades = [
-      ...mensalidades.map(m =>
-        existingIds.includes(m.id)
-          ? { ...m, status: 'pago' as const, paidAt: new Date() }
-          : m
-      ),
-      ...newMensalidades
-    ];
-    
+    const updatedMensalidades = confirmPayments(mensalidadeIds, clients, mensalidades, filiais);
     setMensalidades(updatedMensalidades);
     
     toast({
@@ -263,16 +231,16 @@ export default function Relatorios() {
             Análise de dados e relatórios de inadimplência
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setIsClientSelectOpen(true)}>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setIsClientSelectOpen(true)} size="sm" className="sm:size-default">
             <Receipt className="mr-2 h-4 w-4" />
-            Registrar Pagamento
+            <span className="hidden sm:inline">Registrar</span> Pagamento
           </Button>
-          <Button variant="outline" onClick={() => handleExport('excel')}>
+          <Button variant="outline" size="sm" className="sm:size-default" onClick={() => handleExport('excel')}>
             <Download className="mr-2 h-4 w-4" />
             Excel
           </Button>
-          <Button variant="outline" onClick={() => handleExport('pdf')}>
+          <Button variant="outline" size="sm" className="sm:size-default" onClick={() => handleExport('pdf')}>
             <FileText className="mr-2 h-4 w-4" />
             PDF
           </Button>
@@ -347,9 +315,9 @@ export default function Relatorios() {
           <CardTitle className="text-lg">Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="Período" />
               </SelectTrigger>
               <SelectContent>
@@ -360,7 +328,7 @@ export default function Relatorios() {
             </Select>
             {user?.role === 'admin' && (
               <Select value={selectedFilial} onValueChange={setSelectedFilial}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Filial" />
                 </SelectTrigger>
                 <SelectContent>
