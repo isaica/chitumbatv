@@ -3,13 +3,11 @@
 ##  Info do Projecto
 
 
-
-
 ## Devo eliminar algumas info depois de passar ao Trae
 
 There are several ways of editing your application.
 
-**Use Lovable**
+**Usando o Lovable para prototipazaçºao**
 
 Simply visit the [Lovable Project](https://lovable.dev/projects/cc0deb30-f43d-4226-b0de-c849f1d2eb83) and start prompting.
 
