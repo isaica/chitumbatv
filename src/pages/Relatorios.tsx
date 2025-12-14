@@ -1,29 +1,8 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  Download, 
-  TrendingUp, 
-  TrendingDown,
-  Users, 
-  CreditCard,
-  FileText,
-  DollarSign,
-  AlertTriangle,
-  Receipt
-} from "lucide-react";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
-} from "recharts";
+import { Download, TrendingUp, TrendingDown, Users, CreditCard, FileText, DollarSign, AlertTriangle, Receipt } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { exportToExcel, exportToPDF, ExportColumn } from "@/utils/export";
@@ -35,18 +14,24 @@ import { ClientSelectModal } from "@/components/ui/client-select-modal";
 import { Client } from "@/types";
 import { calculateClientPaymentStatus } from "@/utils/paymentStatus";
 import { confirmPayments } from "@/services/payments";
-
 export default function Relatorios() {
-  const { user } = useAuth();
-  const { clients, mensalidades, filiais, setMensalidades } = useAppStore();
-  
+  const {
+    user
+  } = useAuth();
+  const {
+    clients,
+    mensalidades,
+    filiais,
+    setMensalidades
+  } = useAppStore();
   const [selectedPeriod, setSelectedPeriod] = useState('3months');
   const [selectedFilial, setSelectedFilial] = useState('all');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isClientSelectOpen, setIsClientSelectOpen] = useState(false);
   const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
-  const { toast } = useToast();
-
+  const {
+    toast
+  } = useToast();
   const handleClientSelect = (client: Client) => {
     setSelectedClientForPayment(client);
     setIsClientSelectOpen(false);
@@ -54,33 +39,28 @@ export default function Relatorios() {
   };
 
   // Filter data based on user role
-  const availableFiliais = user?.role === 'admin' 
-    ? filiais 
-    : filiais.filter(f => f.id === user?.filialId);
-
-  const userFilialClients = user?.role === 'admin' 
-    ? clients 
-    : clients.filter(c => c.filialId === user?.filialId);
+  const availableFiliais = user?.role === 'admin' ? filiais : filiais.filter(f => f.id === user?.filialId);
+  const userFilialClients = user?.role === 'admin' ? clients : clients.filter(c => c.filialId === user?.filialId);
 
   // Get kilapeiros (critical clients)
-  const kilapeiros = userFilialClients
-    .map(client => {
-      const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
-      const paymentStatus = calculateClientPaymentStatus(client, clientMensalidades);
-      return { client, paymentStatus };
-    })
-    .filter(({ paymentStatus }) => paymentStatus.status === 'kilapeiro')
-    .sort((a, b) => b.paymentStatus.overdueCount - a.paymentStatus.overdueCount)
-    .slice(0, 5);
+  const kilapeiros = userFilialClients.map(client => {
+    const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
+    const paymentStatus = calculateClientPaymentStatus(client, clientMensalidades);
+    return {
+      client,
+      paymentStatus
+    };
+  }).filter(({
+    paymentStatus
+  }) => paymentStatus.status === 'kilapeiro').sort((a, b) => b.paymentStatus.overdueCount - a.paymentStatus.overdueCount).slice(0, 5);
 
   // Handle payment - centralized using payments service
   const handlePayment = (mensalidadeIds: string[]) => {
     const updatedMensalidades = confirmPayments(mensalidadeIds, clients, mensalidades, filiais);
     setMensalidades(updatedMensalidades);
-    
     toast({
       title: 'Pagamento registrado',
-      description: `${mensalidadeIds.length} ${mensalidadeIds.length === 1 ? 'mensalidade paga' : 'mensalidades pagas'} com sucesso.`,
+      description: `${mensalidadeIds.length} ${mensalidadeIds.length === 1 ? 'mensalidade paga' : 'mensalidades pagas'} com sucesso.`
     });
     setIsPaymentModalOpen(false);
     setSelectedClientForPayment(null);
@@ -90,29 +70,22 @@ export default function Relatorios() {
   const getInadimplenciaData = () => {
     const currentDate = new Date();
     const months = [];
-    
     for (let i = 2; i >= 0; i--) {
       const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-      const monthName = date.toLocaleDateString('pt-AO', { month: 'short' });
+      const monthName = date.toLocaleDateString('pt-AO', {
+        month: 'short'
+      });
       const year = date.getFullYear();
       const month = date.getMonth() + 1;
-      
-      const monthMensalidades = mensalidades.filter(m => 
-        m.year === year && m.month === month
-      );
-      
-      const filteredMensalidades = selectedFilial === 'all' 
-        ? monthMensalidades
-        : monthMensalidades.filter(m => {
-            const client = clients.find(c => c.id === m.clientId);
-            return client?.filialId === selectedFilial;
-          });
-
+      const monthMensalidades = mensalidades.filter(m => m.year === year && m.month === month);
+      const filteredMensalidades = selectedFilial === 'all' ? monthMensalidades : monthMensalidades.filter(m => {
+        const client = clients.find(c => c.id === m.clientId);
+        return client?.filialId === selectedFilial;
+      });
       const total = filteredMensalidades.length;
       const pagos = filteredMensalidades.filter(m => m.status === 'pago').length;
       const atrasados = filteredMensalidades.filter(m => m.status === 'atrasado').length;
       const pendentes = filteredMensalidades.filter(m => m.status === 'pendente').length;
-      
       months.push({
         month: monthName,
         total,
@@ -122,30 +95,28 @@ export default function Relatorios() {
         inadimplencia: total > 0 ? ((atrasados + pendentes) / total * 100).toFixed(1) : 0
       });
     }
-    
     return months;
   };
 
   // Generate status distribution data
   const getStatusDistribution = () => {
-    const filteredClients = selectedFilial === 'all' 
-      ? userFilialClients
-      : userFilialClients.filter(c => c.filialId === selectedFilial);
-      
+    const filteredClients = selectedFilial === 'all' ? userFilialClients : userFilialClients.filter(c => c.filialId === selectedFilial);
     const statusCounts = {
       ativo: filteredClients.filter(c => c.status === 'ativo').length,
-      inativo: filteredClients.filter(c => c.status === 'inativo').length,
+      inativo: filteredClients.filter(c => c.status === 'inativo').length
     };
-
-    return [
-      { name: 'Ativos', value: statusCounts.ativo, color: 'hsl(var(--primary))' },
-      { name: 'Inativos', value: statusCounts.inativo, color: 'hsl(var(--muted))' },
-    ];
+    return [{
+      name: 'Ativos',
+      value: statusCounts.ativo,
+      color: 'hsl(var(--primary))'
+    }, {
+      name: 'Inativos',
+      value: statusCounts.inativo,
+      color: 'hsl(var(--muted))'
+    }];
   };
-
   const inadimplenciaData = getInadimplenciaData();
   const statusDistribution = getStatusDistribution();
-
   const totalClients = statusDistribution.reduce((acc, item) => acc + item.value, 0);
   const activeClients = statusDistribution.find(item => item.name === 'Ativos')?.value || 0;
   const inactiveClients = statusDistribution.find(item => item.name === 'Inativos')?.value || 0;
@@ -153,25 +124,17 @@ export default function Relatorios() {
   // Calculate current month metrics
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
-  const currentMonthMensalidades = mensalidades.filter(m => 
-    m.year === currentYear && m.month === currentMonth
-  );
-
+  const currentMonthMensalidades = mensalidades.filter(m => m.year === currentYear && m.month === currentMonth);
   const handleExport = (type: 'pdf' | 'excel') => {
     // Filter data based on selected filial
-    const filteredClients = selectedFilial === 'all' 
-      ? userFilialClients
-      : userFilialClients.filter(c => c.filialId === selectedFilial);
+    const filteredClients = selectedFilial === 'all' ? userFilialClients : userFilialClients.filter(c => c.filialId === selectedFilial);
 
     // Prepare export data with client info and payment status
     const exportData = filteredClients.map(client => {
       const clientMensalidades = mensalidades.filter(m => m.clientId === client.id);
       const pendingCount = clientMensalidades.filter(m => m.status === 'pendente' || m.status === 'atrasado').length;
-      const totalDebt = clientMensalidades
-        .filter(m => m.status === 'pendente' || m.status === 'atrasado')
-        .reduce((acc, m) => acc + m.amount, 0);
+      const totalDebt = clientMensalidades.filter(m => m.status === 'pendente' || m.status === 'atrasado').reduce((acc, m) => acc + m.amount, 0);
       const filial = filiais.find(f => f.id === client.filialId);
-
       return {
         name: client.name,
         email: client.email,
@@ -183,21 +146,39 @@ export default function Relatorios() {
         createdAt: client.createdAt
       };
     });
-
-    const columns: ExportColumn[] = [
-      { key: 'name', title: 'Nome', width: 40 },
-      { key: 'phone', title: 'Telefone', width: 25 },
-      { key: 'filial', title: 'Filial', width: 30 },
-      { key: 'status', title: 'Status', width: 15, format: (v) => v === 'ativo' ? 'Ativo' : 'Inativo' },
-      { key: 'pendingMonths', title: 'Meses Pendentes', width: 20 },
-      { key: 'totalDebt', title: 'Dívida Total (AOA)', width: 25, format: (v) => v.toLocaleString('pt-AO') },
-      { key: 'createdAt', title: 'Data Cadastro', width: 25, format: (v) => new Date(v).toLocaleDateString('pt-AO') }
-    ];
-
-    const filialName = selectedFilial === 'all' 
-      ? 'Todas as Filiais' 
-      : filiais.find(f => f.id === selectedFilial)?.name || '';
-
+    const columns: ExportColumn[] = [{
+      key: 'name',
+      title: 'Nome',
+      width: 40
+    }, {
+      key: 'phone',
+      title: 'Telefone',
+      width: 25
+    }, {
+      key: 'filial',
+      title: 'Filial',
+      width: 30
+    }, {
+      key: 'status',
+      title: 'Status',
+      width: 15,
+      format: v => v === 'ativo' ? 'Ativo' : 'Inativo'
+    }, {
+      key: 'pendingMonths',
+      title: 'Meses Pendentes',
+      width: 20
+    }, {
+      key: 'totalDebt',
+      title: 'Dívida Total (AOA)',
+      width: 25,
+      format: v => v.toLocaleString('pt-AO')
+    }, {
+      key: 'createdAt',
+      title: 'Data Cadastro',
+      width: 25,
+      format: v => new Date(v).toLocaleDateString('pt-AO')
+    }];
+    const filialName = selectedFilial === 'all' ? 'Todas as Filiais' : filiais.find(f => f.id === selectedFilial)?.name || '';
     const options = {
       filename: `relatorio_clientes_${new Date().toISOString().split('T')[0]}`,
       title: 'Relatório de Clientes - ALF Chitumba',
@@ -206,24 +187,21 @@ export default function Relatorios() {
       data: exportData,
       orientation: 'landscape' as const
     };
-
     if (type === 'pdf') {
       exportToPDF(options);
       toast({
         title: 'PDF Exportado',
-        description: 'O relatório foi exportado com sucesso.',
+        description: 'O relatório foi exportado com sucesso.'
       });
     } else {
       exportToExcel(options);
       toast({
         title: 'Excel Exportado',
-        description: 'O relatório foi exportado com sucesso.',
+        description: 'O relatório foi exportado com sucesso.'
       });
     }
   };
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gradient">Relatórios</h1>
@@ -248,66 +226,7 @@ export default function Relatorios() {
       </div>
 
       {/* Critical Clients Alert */}
-      {kilapeiros.length > 0 && (
-        <Card className="border-l-4 border-l-destructive bg-destructive/5">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-destructive" />
-                <CardTitle className="text-lg">Kilapeiros - Pagamento Rápido</CardTitle>
-              </div>
-              <Badge variant="destructive" className="text-sm">
-                {kilapeiros.length} Clientes
-              </Badge>
-            </div>
-            <CardDescription>
-              Clientes com pagamentos em atraso - clique em "Pagar" para registrar
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {kilapeiros.map(({ client, paymentStatus }) => {
-                const filial = filiais.find(f => f.id === client.filialId);
-                return (
-                  <div 
-                    key={client.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-background border hover:border-destructive transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{client.name}</p>
-                        <Badge 
-                          variant="destructive"
-                          className="text-xs"
-                        >
-                          {paymentStatus.overdueCount} meses
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                        <span>{filial?.name}</span>
-                        <span className="text-destructive font-medium">
-                          Dívida: {paymentStatus.totalDebt.toLocaleString()} AOA
-                        </span>
-                      </div>
-                    </div>
-                    <Button 
-                      size="sm" 
-                      className="gradient-primary"
-                      onClick={() => {
-                        setSelectedClientForPayment(client);
-                        setIsPaymentModalOpen(true);
-                      }}
-                    >
-                      <CreditCard className="w-4 h-4 mr-1" />
-                      Pagar
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {kilapeiros.length > 0}
 
       {/* Filters */}
       <Card className="border-0 shadow-primary">
@@ -326,21 +245,17 @@ export default function Relatorios() {
                 <SelectItem value="1year">Último Ano</SelectItem>
               </SelectContent>
             </Select>
-            {user?.role === 'admin' && (
-              <Select value={selectedFilial} onValueChange={setSelectedFilial}>
+            {user?.role === 'admin' && <Select value={selectedFilial} onValueChange={setSelectedFilial}>
                 <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Filial" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as Filiais</SelectItem>
-                  {filiais.map((filial) => (
-                    <SelectItem key={filial.id} value={filial.id}>
+                  {filiais.map(filial => <SelectItem key={filial.id} value={filial.id}>
                       {filial.name}
-                    </SelectItem>
-                  ))}
+                    </SelectItem>)}
                 </SelectContent>
-              </Select>
-            )}
+              </Select>}
           </div>
         </CardContent>
       </Card>
@@ -367,7 +282,7 @@ export default function Relatorios() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {totalClients > 0 ? ((activeClients / totalClients) * 100).toFixed(1) : 0}%
+              {totalClients > 0 ? (activeClients / totalClients * 100).toFixed(1) : 0}%
             </div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <span>clientes ativos</span>
@@ -438,39 +353,28 @@ export default function Relatorios() {
             <div className="space-y-4">
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
-                  <Pie
-                    data={statusDistribution}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    dataKey="value"
-                  >
-                    {statusDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
+                  <Pie data={statusDistribution} cx="50%" cy="50%" outerRadius={80} dataKey="value">
+                    {statusDistribution.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                   </Pie>
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
               
               <div className="space-y-2">
-                {statusDistribution.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between">
+                {statusDistribution.map((item, index) => <div key={index} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: item.color }}
-                      />
+                      <div className="w-3 h-3 rounded-full" style={{
+                    backgroundColor: item.color
+                  }} />
                       <span className="text-sm">{item.name}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">{item.value}</span>
                       <Badge variant="secondary" className="text-xs">
-                        {totalClients > 0 ? ((item.value / totalClients) * 100).toFixed(1) : 0}%
+                        {totalClients > 0 ? (item.value / totalClients * 100).toFixed(1) : 0}%
                       </Badge>
                     </div>
-                  </div>
-                ))}
+                  </div>)}
               </div>
             </div>
           </CardContent>
@@ -487,13 +391,10 @@ export default function Relatorios() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
-            {inadimplenciaData.map((month, index) => (
-              <div key={index} className="p-4 rounded-lg border bg-card">
+            {inadimplenciaData.map((month, index) => <div key={index} className="p-4 rounded-lg border bg-card">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">{month.month}</h3>
-                  <Badge 
-                    variant={parseFloat(month.inadimplencia as string) > 30 ? 'destructive' : 'default'}
-                  >
+                  <Badge variant={parseFloat(month.inadimplencia as string) > 30 ? 'destructive' : 'default'}>
                     {month.inadimplencia}% inadimplência
                   </Badge>
                 </div>
@@ -515,36 +416,18 @@ export default function Relatorios() {
                     <span className="font-medium">{month.pendentes}</span>
                   </div>
                 </div>
-              </div>
-            ))}
+              </div>)}
           </div>
         </CardContent>
       </Card>
 
       {/* Client Select Modal */}
-      <ClientSelectModal
-        open={isClientSelectOpen}
-        onClose={() => setIsClientSelectOpen(false)}
-        onSelectClient={handleClientSelect}
-        clients={clients}
-        filiais={filiais}
-        mensalidades={mensalidades}
-      />
+      <ClientSelectModal open={isClientSelectOpen} onClose={() => setIsClientSelectOpen(false)} onSelectClient={handleClientSelect} clients={clients} filiais={filiais} mensalidades={mensalidades} />
 
       {/* Payment Modal */}
-      {selectedClientForPayment && (
-        <QuickPaymentModal
-          client={selectedClientForPayment}
-          mensalidades={mensalidades.filter(m => m.clientId === selectedClientForPayment.id)}
-          filiais={filiais}
-          open={isPaymentModalOpen}
-          onClose={() => {
-            setIsPaymentModalOpen(false);
-            setSelectedClientForPayment(null);
-          }}
-          onPayment={handlePayment}
-        />
-      )}
-    </div>
-  );
+      {selectedClientForPayment && <QuickPaymentModal client={selectedClientForPayment} mensalidades={mensalidades.filter(m => m.clientId === selectedClientForPayment.id)} filiais={filiais} open={isPaymentModalOpen} onClose={() => {
+      setIsPaymentModalOpen(false);
+      setSelectedClientForPayment(null);
+    }} onPayment={handlePayment} />}
+    </div>;
 }
