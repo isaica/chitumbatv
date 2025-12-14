@@ -405,7 +405,7 @@ export default function Usuarios() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="role">Função</Label>
-                    <Select onValueChange={(value: 'admin' | 'gerente' | 'funcionario') => setValue('role', value)}>
+                    <Select value={watchedRole} onValueChange={(value: 'admin' | 'gerente' | 'funcionario') => setValue('role', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione a função" />
                       </SelectTrigger>
@@ -419,7 +419,7 @@ export default function Usuarios() {
                   {watchedRole !== 'admin' && (
                     <div className="space-y-2">
                       <Label htmlFor="filialId">Filial</Label>
-                      <Select onValueChange={(value) => setValue('filialId', value)}>
+                      <Select value={watch('filialId')} onValueChange={(value) => setValue('filialId', value)}>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione a filial" />
                         </SelectTrigger>
