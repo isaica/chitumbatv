@@ -53,14 +53,16 @@ export function RevenueByFilialChart({ filiais, clients, mensalidades }: Revenue
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
           <BarChart data={revenueByFilial}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <CartesianGrid strokeDasharray="3 3" className="stroke-chart-grid" />
             <XAxis 
               dataKey="name" 
-              stroke="hsl(var(--muted-foreground))"
+              className="fill-chart-text"
+              stroke="currentColor"
               fontSize={12}
             />
             <YAxis 
-              stroke="hsl(var(--muted-foreground))"
+              className="fill-chart-text"
+              stroke="currentColor"
               fontSize={12}
               tickFormatter={formatCurrency}
             />
@@ -97,13 +99,13 @@ export function RevenueByFilialChart({ filiais, clients, mensalidades }: Revenue
             <Legend />
             <Bar 
               dataKey="receita" 
-              fill="hsl(var(--primary))" 
+              fill="hsl(var(--chart-1))" 
               name="Receita Realizada"
               radius={[8, 8, 0, 0]}
             />
             <Bar 
               dataKey="meta" 
-              fill="hsl(var(--muted))" 
+              fill="hsl(var(--chart-4))" 
               name="Meta"
               radius={[8, 8, 0, 0]}
             />

@@ -45,8 +45,8 @@ const revenueData = [
 ];
 
 const statusDistribution = [
-  { name: 'Ativos', value: 234, color: 'hsl(var(--primary))' },
-  { name: 'Inativos', value: 45, color: 'hsl(var(--muted))' },
+  { name: 'Ativos', value: 234, color: 'hsl(var(--chart-1))' },
+  { name: 'Inativos', value: 45, color: 'hsl(var(--chart-4))' },
 ];
 
 const growthData = [
@@ -462,17 +462,23 @@ export default function Dashboard() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
                   <AreaChart data={revenueData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-chart-grid" />
+                    <XAxis dataKey="month" className="fill-chart-text" stroke="currentColor" />
+                    <YAxis className="fill-chart-text" stroke="currentColor" />
                     <Tooltip 
                       formatter={(value) => [`AOA ${Number(value).toLocaleString('pt-AO')}`, '']}
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        borderColor: 'hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                      labelStyle={{ color: 'hsl(var(--foreground))' }}
                     />
                     <Area 
                       type="monotone" 
                       dataKey="receita" 
-                      stroke="hsl(var(--primary))" 
-                      fill="hsl(var(--primary))" 
+                      stroke="hsl(var(--chart-1))" 
+                      fill="hsl(var(--chart-1))" 
                       fillOpacity={0.3}
                       name="Receita"
                     />
@@ -521,14 +527,21 @@ export default function Dashboard() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={paymentData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-chart-grid" />
+                    <XAxis dataKey="month" className="fill-chart-text" stroke="currentColor" />
+                    <YAxis className="fill-chart-text" stroke="currentColor" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        borderColor: 'hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                      labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    />
                     <Legend />
-                    <Bar dataKey="pago" fill="hsl(var(--primary))" name="Pago" />
-                    <Bar dataKey="atrasado" fill="hsl(var(--destructive))" name="Atrasado" />
-                    <Bar dataKey="pendente" fill="hsl(var(--warning))" name="Pendente" />
+                    <Bar dataKey="pago" fill="hsl(var(--chart-1))" name="Pago" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="atrasado" fill="hsl(var(--chart-5))" name="Atrasado" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="pendente" fill="hsl(var(--chart-3))" name="Pendente" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -559,24 +572,33 @@ export default function Dashboard() {
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={growthData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip />
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-chart-grid" />
+                  <XAxis dataKey="month" className="fill-chart-text" stroke="currentColor" />
+                  <YAxis yAxisId="left" className="fill-chart-text" stroke="currentColor" />
+                  <YAxis yAxisId="right" orientation="right" className="fill-chart-text" stroke="currentColor" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      borderColor: 'hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  />
                   <Legend />
                   <Line 
                     yAxisId="left"
                     type="monotone" 
                     dataKey="clientes" 
-                    stroke="hsl(var(--primary))" 
+                    stroke="hsl(var(--chart-1))" 
+                    strokeWidth={2}
                     name="Total de Clientes"
                   />
                   <Line 
                     yAxisId="right"
                     type="monotone" 
                     dataKey="crescimento" 
-                    stroke="hsl(var(--success))" 
+                    stroke="hsl(var(--chart-2))" 
+                    strokeWidth={2}
                     name="Crescimento (%)"
                   />
                 </LineChart>
@@ -603,7 +625,7 @@ export default function Dashboard() {
                       cy="50%"
                       labelLine={false}
                       outerRadius={100}
-                      fill="#8884d8"
+                      fill="hsl(var(--chart-1))"
                       dataKey="value"
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
@@ -611,7 +633,14 @@ export default function Dashboard() {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        borderColor: 'hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                      labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
