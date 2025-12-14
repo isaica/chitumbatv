@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart
@@ -159,7 +159,16 @@ export default function Dashboard() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isClientSelectOpen, setIsClientSelectOpen] = useState(false);
   const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const currentMonth = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+
+  // Simulate initial data loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleClientSelect = (client: Client) => {
     setSelectedClientForPayment(client);
@@ -383,39 +392,50 @@ export default function Dashboard() {
 
       {/* Metrics Cards */}
       <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="Total de Clientes"
-          value={metrics.totalClients}
-          description="clientes cadastrados"
-          icon={Users}
-          trend="up"
-          trendValue="+5.2%"
-        />
-        <MetricCard
-          title="Clientes Ativos"
-          value={metrics.activeClients}
-          description="clientes ativos"
-          icon={UserCheck}
-          trend="up"
-          trendValue="+2.1%"
-        />
-        <MetricCard
-          title="Mensalidades Pagas"
-          value={metrics.monthlyPaid}
-          description="neste mês"
-          icon={CreditCard}
-          trend="up"
-          trendValue="+12.5%"
-        />
-        <MetricCard
-          title="Kilapeiros Críticos"
-          value={totalOverdueClients}
-          description="clientes com atraso"
-          icon={AlertTriangle}
-          trend="down"
-          trendValue="-3.2%"
-          className={totalOverdueClients > 0 ? 'border-l-4 border-l-destructive' : ''}
-        />
+        {isLoading ? (
+          <>
+            <MetricCardSkeleton />
+            <MetricCardSkeleton />
+            <MetricCardSkeleton />
+            <MetricCardSkeleton />
+          </>
+        ) : (
+          <>
+            <MetricCard
+              title="Total de Clientes"
+              value={metrics.totalClients}
+              description="clientes cadastrados"
+              icon={Users}
+              trend="up"
+              trendValue="+5.2%"
+            />
+            <MetricCard
+              title="Clientes Ativos"
+              value={metrics.activeClients}
+              description="clientes ativos"
+              icon={UserCheck}
+              trend="up"
+              trendValue="+2.1%"
+            />
+            <MetricCard
+              title="Mensalidades Pagas"
+              value={metrics.monthlyPaid}
+              description="neste mês"
+              icon={CreditCard}
+              trend="up"
+              trendValue="+12.5%"
+            />
+            <MetricCard
+              title="Kilapeiros Críticos"
+              value={totalOverdueClients}
+              description="clientes com atraso"
+              icon={AlertTriangle}
+              trend="down"
+              trendValue="-3.2%"
+              className={totalOverdueClients > 0 ? 'border-l-4 border-l-destructive' : ''}
+            />
+          </>
+        )}
       </div>
 
       {/* Enhanced Charts Section */}
