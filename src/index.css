@@ -265,4 +265,38 @@ All colors MUST be HSL.
   .warning-row {
     @apply border-l-4 border-warning;
   }
+
+  /* Mobile-specific utilities */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  /* Improve touch targets on mobile */
+  @media (max-width: 640px) {
+    .mobile-touch-target {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Improve text readability on small screens */
+  @media (max-width: 640px) {
+    .mobile-text-readable {
+      font-size: clamp(0.875rem, 4vw, 1rem);
+      line-height: 1.5;
+    }
+  }
 }
