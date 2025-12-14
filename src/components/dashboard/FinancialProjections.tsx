@@ -158,22 +158,24 @@ export function FinancialProjections({ filiais, clients, mensalidades }: Financi
             <AreaChart data={combinedData}>
               <defs>
                 <linearGradient id="colorReceita" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0}/>
                 </linearGradient>
                 <linearGradient id="colorProjecao" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <CartesianGrid strokeDasharray="3 3" className="stroke-chart-grid" />
               <XAxis 
                 dataKey="month" 
-                stroke="hsl(var(--muted-foreground))"
+                className="fill-chart-text"
+                stroke="currentColor"
                 fontSize={12}
               />
               <YAxis 
-                stroke="hsl(var(--muted-foreground))"
+                className="fill-chart-text"
+                stroke="currentColor"
                 fontSize={12}
                 tickFormatter={formatCurrency}
               />
@@ -200,7 +202,7 @@ export function FinancialProjections({ filiais, clients, mensalidades }: Financi
               <Area
                 type="monotone"
                 dataKey="receita"
-                stroke="hsl(var(--primary))"
+                stroke="hsl(var(--chart-1))"
                 fillOpacity={1}
                 fill="url(#colorReceita)"
                 name="Receita Realizada"
@@ -208,7 +210,7 @@ export function FinancialProjections({ filiais, clients, mensalidades }: Financi
               <Area
                 type="monotone"
                 dataKey="projecao"
-                stroke="hsl(var(--success))"
+                stroke="hsl(var(--chart-2))"
                 fillOpacity={1}
                 fill="url(#colorProjecao)"
                 strokeDasharray="5 5"
@@ -217,7 +219,7 @@ export function FinancialProjections({ filiais, clients, mensalidades }: Financi
               <Line
                 type="monotone"
                 dataKey="otimista"
-                stroke="hsl(var(--success))"
+                stroke="hsl(var(--chart-2))"
                 strokeDasharray="3 3"
                 strokeWidth={1}
                 dot={false}
@@ -226,7 +228,7 @@ export function FinancialProjections({ filiais, clients, mensalidades }: Financi
               <Line
                 type="monotone"
                 dataKey="pessimista"
-                stroke="hsl(var(--destructive))"
+                stroke="hsl(var(--chart-5))"
                 strokeDasharray="3 3"
                 strokeWidth={1}
                 dot={false}

@@ -156,6 +156,15 @@ All colors MUST be HSL.
 }
 
 @layer utilities {
+  /* Chart utilities */
+  .stroke-chart-grid {
+    stroke: hsl(var(--chart-grid));
+  }
+  
+  .fill-chart-text {
+    fill: hsl(var(--chart-text));
+  }
+
   .gradient-primary {
     background: var(--gradient-primary);
   }
