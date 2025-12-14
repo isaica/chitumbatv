@@ -868,21 +868,21 @@ export default function Clientes() {
 
       {/* Bulk Actions */}
       {selectedClients.length > 0 && (
-        <Card className="border-primary bg-primary/5">
-          <CardContent className="py-3 px-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">
-                {selectedClients.length} cliente(s) selecionado(s)
+        <Card className="border-primary bg-primary/5 sticky bottom-4 z-40 shadow-lg">
+          <CardContent className="py-2 sm:py-3 px-3 sm:px-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
+              <span className="text-xs sm:text-sm font-medium">
+                {selectedClients.length} {isMobile ? 'selecionado(s)' : 'cliente(s) selecionado(s)'}
               </span>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => handleBulkAction('remind')}>
-                  Enviar Lembretes
+              <div className="flex flex-wrap gap-1.5 sm:gap-2 w-full sm:w-auto">
+                <Button size="sm" variant="outline" onClick={() => handleBulkAction('remind')} className="flex-1 sm:flex-none text-xs h-8">
+                  {isMobile ? 'Lembrete' : 'Enviar Lembretes'}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => handleBulkAction('export')}>
-                  Exportar Selecionados
+                <Button size="sm" variant="outline" onClick={() => handleBulkAction('export')} className="flex-1 sm:flex-none text-xs h-8">
+                  {isMobile ? 'Exportar' : 'Exportar Selecionados'}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setSelectedClients([])}>
-                  Limpar Seleção
+                <Button size="sm" variant="ghost" onClick={() => setSelectedClients([])} className="text-xs h-8 px-2">
+                  Limpar
                 </Button>
               </div>
             </div>
@@ -914,31 +914,40 @@ export default function Clientes() {
                 </CardHeader>
                 <CardContent className="p-0">
                   {isMobile ? (
-                    <div className="divide-y">
+                    <div className="divide-y divide-border/50">
                       {paginatedClients.map((client) => (
                         <MobileCard
                           key={client.id}
+                          onClick={() => handleViewDetails(client)}
                           actions={
                             <MobileActionMenu
                               actions={[
-                                { label: 'Ver Detalhes', onClick: () => handleViewDetails(client) },
-                                { label: 'Registrar Pagamento', onClick: () => handleRegisterPayment(client.id) },
-                                { label: 'Editar', onClick: () => handleOpenDialog(client) },
-                                { label: 'Excluir', onClick: () => handleDeleteClick(client), variant: 'destructive' },
+                                { label: 'Ver Detalhes', onClick: () => handleViewDetails(client), icon: <Eye className="w-4 h-4" /> },
+                                { label: 'Pagamento', onClick: () => handleRegisterPayment(client.id), icon: <CreditCard className="w-4 h-4" /> },
+                                { label: 'Editar', onClick: () => handleOpenDialog(client), icon: <Edit className="w-4 h-4" /> },
+                                { label: 'Excluir', onClick: () => handleDeleteClick(client), icon: <Trash2 className="w-4 h-4" />, variant: 'destructive' },
                               ]}
                             />
                           }
                         >
-                          <div className="font-medium">{client.name}</div>
-                          <div className="text-sm text-muted-foreground">{getFilialName(client.filialId)}</div>
-                          <div className="mt-2 flex items-center gap-2">
-                            <StatusBadge status={getStatusLabel(client.paymentStatus.status)} />
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-semibold text-sm truncate">{client.name}</h4>
+                              <p className="text-xs text-muted-foreground truncate">{getFilialName(client.filialId)}</p>
+                            </div>
+                            <StatusBadge status={getStatusLabel(client.paymentStatus.status)} size="sm" />
                           </div>
-                          <div className="mt-2 text-sm">
-                            <span className="text-muted-foreground">Telefone:</span> {client.phone}
-                          </div>
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Dívida:</span> {formatCurrency(client.paymentStatus.totalDebt)}
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-2">
+                            <div className="flex items-center gap-1.5">
+                              <User className="w-3 h-3 text-muted-foreground" />
+                              <span className="truncate">{client.phone}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <DollarSign className="w-3 h-3 text-muted-foreground" />
+                              <span className={client.paymentStatus.totalDebt > 0 ? 'text-destructive font-medium' : ''}>
+                                {formatCurrency(client.paymentStatus.totalDebt)}
+                              </span>
+                            </div>
                           </div>
                         </MobileCard>
                       ))}
