@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { GlobalSearch } from './GlobalSearch';
 import { NotificationDropdown } from './NotificationDropdown';
 import { MobileSearch } from './MobileSearch';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 
 export function Header() {
@@ -39,9 +40,11 @@ export function Header() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* Mobile Search */}
           <MobileSearch />
+          
+          <ThemeToggle />
           
           <NotificationDropdown />
 
