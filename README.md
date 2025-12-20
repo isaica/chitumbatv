@@ -1,6 +1,6 @@
 # Branch main para Backup
 
-##  Info do Projectooo
+##  Informações do Projecto
 
 
 ## Devo eliminar algumas info depois de passar ao Trae
