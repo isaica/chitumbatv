@@ -1,12 +1,12 @@
 # Welcome to your Lovable project
 
-## Project info
+## Informações do Projecto
 
 ## How can I edit this code?
 
 There are several ways of editing your application.
 
-**Use Lovable**
+**Use o Lovable para construir um app**
 
 Simply visit the [Lovable Project](https://lovable.dev/projects/cc0deb30-f43d-4226-b0de-c849f1d2eb83) and start prompting.
 
