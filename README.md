@@ -19,7 +19,7 @@ If you want to work locally using your own IDE, you can clone this repo and push
 
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-Follow these steps:
+Siga estes passos:
 
 ```sh
 # Step 1: Clone the repository using the project's Git URL.
@@ -59,7 +59,7 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## IDE (Vibe Coding)
+## IDE usados (Vibe Coding)
 
 - Lovable
 - Trae
